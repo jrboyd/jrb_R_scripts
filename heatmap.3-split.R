@@ -746,7 +746,7 @@ heatmap.3 <- function (x,
     if(nrow(c1 > 1))
       nc1 = t(apply(c1,MARGIN = 1,FUN = function(row) return(row/(maxVal-minVal))))
     #nc1=c1
-    mc1 = colMeans(((nc1)))
+    mc1 = colMeans(((c1)))
     #   plot(x = range(1:3),y = range(nc1), col = rgb(0,0,0,.3))
     #   for(i in 1:nrow(nc1)){
     #     lines(1:3,nc1[i,])
@@ -793,7 +793,7 @@ heatmap.3 <- function (x,
     # set up the plot 
     #op <- par(mar = rep(.01, 4))
     plot(xrange, yrange, xaxt='n',yaxt='n', type="n", xlab="",
-         ylab="", ylim = c(0,1.04)) 
+         ylab="", ylim = c(minVal - .1*abs(minVal - maxVal),maxVal + .1*abs(minVal - maxVal))) 
     colors <- colorClasses[o[,1]] 
     linetype <- c(1:classCount) 
     plotchar <- seq(18,18+classCount,1)
