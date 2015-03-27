@@ -233,7 +233,7 @@ heatmap.3 <- function (x,
   #jrb row side colors is default and get data classes
   dataClasses = cutree(tree=hcr, k=classCount)
   orderOfClasses = unique(dataClasses[rowInd])
-  tmp = 6:1
+  tmp = classCount:1
   tmp = tmp[order(orderOfClasses)]
   require('RColorBrewer')
   colorClasses = brewer.pal(n = classCount,name = "Dark2")
