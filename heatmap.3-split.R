@@ -233,7 +233,6 @@ heatmap.3 <- function (x,
   orderOfClasses = unique(dataClasses[rowInd])
   tmp = 6:1
   tmp = tmp[order(orderOfClasses)]
-  dataClasses
   require('RColorBrewer')
   colorClasses = brewer.pal(n = classCount,name = "Dark2")
   colorClasses = colorClasses[tmp]
@@ -282,13 +281,33 @@ heatmap.3 <- function (x,
     colInd <- 1:nc
   }
   
+  
+#   o=matrix(0,nrow=classCount,ncol=2)
+#   colnames(o)=c('class index', 'class size')
+#   ordered=dataClasses[rev(rowInd)]
+#   for(i in 1:classCount){
+#     totalLength=length(ordered)
+#     classIndex = ordered[1]
+#     keep=ordered!=ordered[1]
+#     ordered=ordered[keep]
+#     classSize = totalLength - length(ordered)
+#     o[i,] = c(classIndex, classSize)
+#   }
+  
+  if(clusterSort){#sort within each cluster, max rowSums at top
+    for(i in 1:classCount){
+      keep = dataClasses[rowInd] == i 
+      in_cluster_o = order(rowSums(x[rowInd,][keep,]))
+      x[rowInd,][keep,] = x[rowInd,][keep,][in_cluster_o,]
+    }
+  }
   retval$rowInd <- rowInd
   retval$colInd <- colInd
   retval$call <- match.call()
   
-  
   ## reorder x & cellnote
   x <- x[rowInd, colInd]
+  
   x.unscaled <- x
   cellnote <- cellnote[rowInd, colInd]
   
