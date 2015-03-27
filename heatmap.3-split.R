@@ -299,8 +299,9 @@ heatmap.3 <- function (x,
   if(clusterSort){#sort within each cluster, max rowSums at top
     for(i in 1:classCount){
       keep = dataClasses[rowInd] == i 
-      in_cluster_o = order(rowSums(x[rowInd,][keep,]))
-      x[rowInd,][keep,] = x[rowInd,][keep,][in_cluster_o,]
+      subset = x[rowInd,,drop = F][keep,,drop = F]
+      in_cluster_o = order(rowSums(subset))
+      x[rowInd,][keep,] = subset[in_cluster_o,]
     }
   }
   retval$rowInd <- rowInd
