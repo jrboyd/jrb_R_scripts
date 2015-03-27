@@ -34,6 +34,8 @@ heatmap.3 <- function (x,
                        
                        ## data scaling
                        scale = c("none","row", "column"),
+                       minVal = min(x),
+                       maxVal = max(x),
                        na.rm=TRUE,
                        
                        ## image plot
@@ -110,7 +112,7 @@ heatmap.3 <- function (x,
                        ...
 )
 {
-  scale01 <- function(x, low=min(x), high=max(x) )
+  scale01 <- function(x, low=minVal, high=maxVal )
   {
     x <- (x-low)/(high - low)
     x
@@ -346,7 +348,7 @@ heatmap.3 <- function (x,
   if(length(breaks)==1)
   {
     if(!symbreaks)
-      breaks <- seq( min(x, na.rm=na.rm), max(x,na.rm=na.rm), length=breaks)
+      breaks <- seq( min(minVal, na.rm=na.rm), max(maxVal,na.rm=na.rm), length=breaks)
     else
     {
       extreme <- max(abs(x), na.rm=TRUE)
@@ -690,8 +692,8 @@ heatmap.3 <- function (x,
     }
     else
     {
-      min.raw <- min(x, na.rm=TRUE) ## Again, modified to use scaled
-      max.raw <- max(x, na.rm=TRUE) ## or unscaled (SD 12/2/03)
+      min.raw <- min(minVal, na.rm=TRUE) ## Again, modified to use scaled
+      max.raw <- max(maxVal, na.rm=TRUE) ## or unscaled (SD 12/2/03)
     }
     
     z <- seq(min.raw, max.raw, length=length(col))
