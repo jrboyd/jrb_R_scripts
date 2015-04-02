@@ -1,6 +1,9 @@
+
 countDir.read = function(countDir){
   #given a directory containing counts files, return assembled matrix containing all data
   #count files must have same number of rows in the same order (no changing feature annotation)
+  #count_unaligned : htseq-count outputs 5 rows of unaligned read types, should they be counted?
+  #NOTE : keep as true for counts not from htseq-count
   files = dir(countDir, full.names = T)
   
   dat = NULL
@@ -21,51 +24,13 @@ countDir.read = function(countDir){
   return(dat)
 }
 
+
+
 countDir.example = function(){
   d = 'h:/projects/Terri/paper_v4/chrm_counts'
   tmp = countDir.read(d)
   return(tmp)
 }
-
-exData = countDir.example()
-exData = exData[1:(nrow(exData)-5),]
-exData = apply(exData, 2, function(x)return(x / sum(x) * 1000000))
-
-chrSizes = read.table('hg38.chrom.sizes', row.names = 1)
-chrSizes = chrSizes[rownames(exData),,drop = F]
-
-for(r in 1:nrow(exData)){
-  key = rownames(exData)[r]
-  exData[r,] = exData[r,] / chrSizes[key,1] * 1000
-}
-
-tmp = strsplit(colnames(exData), '[\\._]')
-cell_lines = sapply(tmp, function(x)return(x[1]))
-histone_mods = sapply(tmp, function(x)return(x[2]))
-colnames(exData) = paste(cell_lines, histone_mods)
-
-
-boxplot(exData, range = 10^-20)
-boxplot(t(exData), range = 10^-20)
-
-heatmap.2((t(exData)+1), trace = 'n', scale = 'n', Rowv = F, margins = c(5,12))
-
-
-feData = matrix(0, nrow = nrow(exData), ncol = 0)
-for(i in 1:ncol(exData)){
-  cname = colnames(exData)[i]
-  l = strsplit(cname, ' ')[[1]][1]
-  m = strsplit(cname, ' ')[[1]][2]
-  if(m == 'input'){
-    next
-  }
-  fe_dat = exData[,i] / exData[,paste(l, 'input')]
-  feData = cbind(feData, fe_dat)
-  colnames(feData)[ncol(feData)] = cname
-}
-feData = feData[rownames(feData)!='chrY',]
-
-heatmap.2((t(feData)+1), trace = 'n', scale = 'n', Rowv = T, margins = c(5,12))
 
 
 if(F){
