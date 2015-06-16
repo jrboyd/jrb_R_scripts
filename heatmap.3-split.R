@@ -741,12 +741,14 @@ heatmap.3 <- function (x,
     if(n>1)
       start = sum(o[1:(n-1),2])+1
     end=sum(o[1:n,2])
-    c1 = as.matrix(revx[start:end,])
+    c1 = as.matrix(revx[start:end,,drop = F])
+    #print(c1)
     nc1 = c1[1,]
-    if(nrow(c1 > 1))
+    if(nrow(c1) > 1)
       nc1 = t(apply(c1,MARGIN = 1,FUN = function(row) return(row/(maxVal-minVal))))
     #nc1=c1
-    mc1 = colMeans(((c1)))
+    mc1 = c1
+    if(nrow(c1) > 1) mc1 = colMeans(c1)
     #   plot(x = range(1:3),y = range(nc1), col = rgb(0,0,0,.3))
     #   for(i in 1:nrow(nc1)){
     #     lines(1:3,nc1[i,])
@@ -788,6 +790,7 @@ heatmap.3 <- function (x,
   for (i in 1:classCount) { 
     xrange <- as.numeric(range(1:ncol(avgA)))
     yrange <- range(avgA)
+    #print(avgA)
     
     
     # set up the plot 
@@ -800,7 +803,7 @@ heatmap.3 <- function (x,
     
     #   axis(side=1,tick=TRUE,at=days)
     tree <- avgA[i,]
-    
+    #print(tree)
     for(s in 1:nsplits){
       start = (s - 1) * win + 1
       end = s * win
