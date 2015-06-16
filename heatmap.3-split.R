@@ -831,6 +831,42 @@ heatmap.3 <- function (x,
 
 # $Id: textplot.R 1213 2007-11-01 20:20:10Z warnes $
 
+## Function to replace all tabs in a string with an appropriate number of spaces.
+
+# handle a single character string
+replaceTabs.inner <-  function( text, width=8 )
+{
+  spaces <- "        "
+  
+  if(nchar(text)<1) return(text)
+  
+  text.split <- strsplit(text,"\t")[[1]]
+  if(length(text.split)==1)
+    return(text)
+  else
+  {
+    nSpaceAdd <- 8 - nchar(text.split) %% 8
+    nSpaceAdd[length(nSpaceAdd)] <- 0
+    nSpaceAdd[nSpaceAdd==8] <- 0
+    
+    retval <- ""
+    for(i in 1:length(text.split))
+    {
+      tmp.text <- chartr("\t"," ", text.split[i]) # one space here
+      retval <- paste(retval, tmp.text, substr(spaces,0,nSpaceAdd[i]-1 ), sep='' ) # rest here
+    }
+    return(retval)
+  }
+}
+
+replaceTabs <- function(text, width=8)
+{
+  text <- as.character(text)
+  retval <- sapply(text, replaceTabs.inner) 
+  names(retval) <- names(text)
+  retval
+}
+
 textplot <- function(object, halign="center", valign="center", cex, ... )
   UseMethod('textplot')
 
@@ -1148,9 +1184,25 @@ plot.HeatmapLists = function(heatmap3_output){
     soFar = soFar + size
     colors_out[start:end,] = classColors[j]
   }
-  a = matrix("black", nrow = 100, ncol = 10)
-  b = matrix("", nrow = 100, ncol = 10)
-  a[1:nrow(colors_out)] = colors_out[1:nrow(colors_out)]
-  b[1:nrow(data_out)] = data_out[1:nrow(data_out)]
-  textplot(b, col.data = a, show.rownames = F, show.colnames = F, halign = "left", hadj = 0)
+  colSize = 50
+  while(nrow(data_out) %% colSize != 0){
+    data_out = rbind(data_out, '')
+    colors_out = rbind(colors_out, 'black')
+  }
+  
+  a = matrix(colors_out, nrow = colSize)
+  b = matrix(data_out, nrow = colSize)
+  step = 6
+  while(ncol(a) %% step != 0){
+    a = cbind(a, rep('black', nrow(a)))
+    b = cbind(b, rep('', nrow(a)))
+  }
+  
+  for(i in 1:(ncol(a)/6)){
+    start = (i - 1) * 6 + 1
+    end = i * 6
+    print(start)
+    print(end)
+    textplot(b[,start:end], col.data = a[,start:end], show.rownames = F, show.colnames = F, halign = "left", hadj = 0, cex = .5)
+  }
 }

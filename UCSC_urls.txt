@@ -1,0 +1,5 @@
+
+track name=H1-hESC_H3K4me2_logFE description="H1-hESC H3K4me2" visibility=2 autoScale=off, maxHeightPixels=16:128:128 viewLimits=0:3 color=252,141,98 bigDataUrl=http://www.uvm.edu/~jrboyd/KZ_hESC/H1-hESC_H3K4me2_treat_pileup_logFE.bw type=bigWig
+track name=H1-hESC_H3K4me3_logFE description="H1-hESC H3K4me3" visibility=2 autoScale=off, maxHeightPixels=16:128:128 viewLimits=0:3 color=252,141,98 bigDataUrl=http://www.uvm.edu/~jrboyd/KZ_hESC/H1-hESC_H3K4me3_treat_pileup_logFE.bw type=bigWig
+track name=H1-hESC_H3K27me3_logFE description="H1-hESC H3K27me3" visibility=2 autoScale=off, maxHeightPixels=16:128:128 viewLimits=0:3 color=252,141,98 bigDataUrl=http://www.uvm.edu/~jrboyd/KZ_hESC/H1-hESC_H3K27me3_treat_pileup_logFE.bw type=bigWig
+track name=H1-hESC_c-Myc_logFE description="H1-hESC c-Myc" visibility=2 autoScale=off, maxHeightPixels=16:128:128 viewLimits=0:3 color=252,141,98 bigDataUrl=http://www.uvm.edu/~jrboyd/KZ_hESC/H1-hESC_c-Myc_treat_pileup_logFE.bw type=bigWig

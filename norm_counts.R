@@ -1,4 +1,4 @@
-norm.read_depth = function(counts, reads_per = 10^6){
+norm.read_depth = function(counts, total_mapped_reads, reads_per = 10^6){
   #performs cpm reads type normalization by sample
   #counts : feature x sample matrix
   #eachs column of counts is assumed to be one sample
