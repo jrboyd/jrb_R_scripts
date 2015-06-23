@@ -1,6 +1,3 @@
-
-
-
 #dummy out tracing, dummy out clustering
 heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE, 
                         distfun = dist, hclustfun = hclust, dendrogram = c("both", 
@@ -12,7 +9,7 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
                         sepwidth.minor = 1, sepwidth.major = 3, cellnote, notecex = 1, notecol = "cyan", 
                         na.color = par("bg"), trace = c("column", "row", "both", 
                                                         "none"), tracecol = "cyan", hline = median(breaks), vline = median(breaks), 
-                        linecol = tracecol, mar.top = 2, mar.left = 2, mar.bot = 5, mar.right = 5, ColSideColors, RowSideColors, 
+                        linecol = tracecol, mar.top = 2, mar.left = 2, mar.bot = 5, mar.right = 5, ColSideColors, RowSideColors = NULL, 
                         cexRow = 0.2 + 1/log10(nr), cexCol = 0.2 + 1/log10(nc), labRow = NULL,
                         labCol = NULL, labColAbove = NULL, srtRow = NULL, srtCol = NULL, adjRow = c(0, 
                                                                                                     NA), adjCol = c(.5, .5), offsetRow = 0.5, offsetCol = 0.5, 
@@ -21,19 +18,23 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
                         symkey = any(x < 0, na.rm = TRUE) || symbreaks, densadj = 0.25, 
                         key.title = NULL, key.lab = NA, key.ylab = NULL, key.xtickfun = NULL, 
                         key.ytickfun = NULL, key.par = list(), main = NULL, xlab = NULL, 
-                        ylab = NULL, lmat = NULL, lhei = 1, lwid = NULL, extrafun = NULL, 
+                        ylab = NULL, lmat = NULL, lhei = 1, lwid = NULL, extrafun = NULL, rowsep.major.labels = NULL,
                         ...) 
 {
   x.original = x
+  rowsep.minor.original = rowsep.minor
+  rowsep.major.original = rowsep.major
+  
   scale01 <- function(x, low = min(x), high = max(x)) {
     x <- (x - low)/(high - low)
     x
   }
   
-  plot0 = function(width = 1){
+  plot0 = function(width = 1, height = 1){
     fudge = 0.037037037037
-    plot(c(0+fudge*width, width-fudge * width), 0:1, type = 'n', xlab = '', ylab = '', axes = F, )
+    plot(c(0+fudge*width, width-fudge * width), c(0+fudge*height, height-fudge * height), type = 'n', xlab = '', ylab = '', axes = F, )
   }
+  print(rowsep.major)
   
   dev.width = par('din')[1]
   dev.height = par('din')[2]
@@ -69,32 +70,53 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
     lhei[body.i] = lhei[body.i] - key.height
     lhei = c(lhei, key.height)
   }
+  RowSideColors.size = 0
+  if (!is.null(RowSideColors)) {
+    if (!is.character(RowSideColors) || length(RowSideColors) != nrow(x)) 
+      stop("'RowSideColors' must be a character vector of length nrow(x)")
+    RowSideColors.size = .8
+    lmat <- cbind(lmat, c(rep(0, body.i-1), max(lmat)+1, rep(0, nrow(lmat)-body.i)))
+    lwid <- c(dev.width - RowSideColors.size, RowSideColors.size)
+  }
+  if (!is.null(rowsep.major.labels)) {
+    labRowSize = 1
+    lmat <- cbind(lmat, c(rep(0, body.i-1), max(lmat)+1, rep(0, nrow(lmat)-body.i)))
+    lwid <- c(dev.width - RowSideColors.size - labRowSize, labRowSize)
+  }
   
-  #print(lmat)
+  
+  print(lmat)
   #print(lhei)
   
   
   
-  layout(lmat, heights = lhei)
+  layout(lmat, heights = lhei, widths = lwid)
   
   
   
   x = x[nrow(x):1,]#reverse so heatmap top row is top row of input matrix
+  RowSideColors = rev(RowSideColors)
   nr <- nrow(x)
   nc <- ncol(x)
   
+  
   insert_col = function(n, i){#insert n column following index i
     x <<- cbind(x[,1:i], matrix(NA, nrow = nrow(x), ncol = n),  x[,(i+1):ncol(x)])
-    colsep.minor <<- colsep.minor + n
-    colsep.major <<- colsep.major + n
+    affected = colsep.minor > i
+    colsep.minor[affected] <<- colsep.minor[affected] + n
+    affected = colsep.major > i
+    colsep.major[affected] <<- colsep.major[affected] + n
     if(!is.null(labCol)) labCol <<- c(labCol[1:i], rep('', n), labCol[(i + 1):length(labCol)])
     if(!is.null(labColAbove)) labColAbove <<- c(labColAbove[1:i], rep('', n), labColAbove[(i + 1):length(labColAbove)])
   }
   
   insert_row = function(n, i){#insert n rows following index i
     x <<- rbind(x[1:i,], matrix(NA, ncol = ncol(x), nrow = n),  x[(i+1):nrow(x),])
-    rowsep.minor <<- rowsep.minor + n
-    rowsep.major <<- rowsep.major + n
+    affected = rowsep.minor > i
+    rowsep.minor[affected] <<- rowsep.minor[affected] + n
+    affected = rowsep.major > i
+    rowsep.major[affected] <<- rowsep.major[affected] + n
+    RowSideColors <<- c(RowSideColors[1:i], rep(NA, n), RowSideColors[(i+1):length(RowSideColors)])
   }
   
   #print(dim(x))
@@ -113,6 +135,7 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
   }
   #print(dim(x))
   x = x[nrow(x):1,]#reverse rows temporarily
+  RowSideColors = rev(RowSideColors)
   do_row_major = rowsep.major[1] > -1
   if (rowsep.minor[1] > -1){
     for (i in 1:length(rowsep.minor)){ 
@@ -127,6 +150,7 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
     }
   }
   x = x[nrow(x):1,]#unreverse rows
+  RowSideColors = rev(RowSideColors)
   #print(dim(x))
   nc = ncol(x)
   nr = nrow(x)
@@ -227,5 +251,53 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
             cex = par("cex") * par("cex.lab"))
     }
   }
+  if(!is.null(RowSideColors)){
+    #print(length(RowSideColors))
+    #print(nr)
+    tmp = as.factor(RowSideColors)
+    vals = matrix(as.numeric(tmp), ncol = 1)
+    lev = levels(tmp)
+    #print(dim(vals))
+    #print(length(0:nr))
+    par(mai = c(0,.1,0,.1))
+    image(0:1, 0:nr, t(vals), xlim = c(0, 1), ylim = c(0, nr), axes = FALSE, xlab = "", ylab = "", col = lev)
+  }
+  if(!is.null(rowsep.major.labels)){
+    par(mai = rep(0,4))
+    plot0()
+    print(rowsep.major)
+    print(rowsep.major.labels)
+    for(i in 1:length(rowsep.major.labels)){
+      rsep_prev = 0
+      if(i > 1){
+        rsep_prev = rowsep.major[i - 1] + sepwidth.major
+      }
+      rsep_curr = rowsep.major.original[i]
+      if(i > 1){
+        rsep_curr = rsep_prev + rowsep.major.original[i] - rowsep.major.original[i - 1]
+      }
+      if(i > length(rowsep.major.original)){
+        rsep_curr = nrow(x)
+      }
+#     else{
+#         rsep_curr = nrow(x)
+#       }
+      
+      print(paste(rsep_prev, rsep_curr))
+      #print(nrow(x))
+      rsep_mid = (mean(c(rsep_prev, rsep_curr)))
+      
+      print(rsep_mid)
+      ypos = 1 - (rsep_mid / nrow(x))
+      print(ypos)
+      text(.5, ypos, rowsep.major.labels[i], adj = c(.5,.5) )
+#       text(.5, -.5/nrow(x), 'test', adj = c(.5,.5) )
+#       text(.5, .5/nrow(x), 'test', adj = c(.5,.5) )
+#       text(.5, 1.5/nrow(x), 'test', adj = c(.5,.5) )
+#       text(.5, 1-2.5/nrow(x), 'test', adj = c(.5,.5) )
+    }
+    
+  }
+  
   #print(par('usr'))
 }
