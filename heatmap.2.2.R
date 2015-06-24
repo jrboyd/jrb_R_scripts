@@ -18,7 +18,7 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
                         symkey = any(x < 0, na.rm = TRUE) || symbreaks, densadj = 0.25, 
                         key.title = NULL, key.lab = NA, key.ylab = NULL, key.xtickfun = NULL, 
                         key.ytickfun = NULL, key.par = list(), main = NULL, xlab = NULL, 
-                        ylab = NULL, lmat = NULL, lhei = 1, lwid = NULL, extrafun = NULL, rowsep.major.labels = NULL,
+                        ylab = NULL, lmat = NULL, lhei = 1, lwid = NULL, extrafun = NULL, rowsep.major.labels = NULL, left_mai = .7, cex.main = 2,
                         ...) 
 {
   x.original = x
@@ -42,8 +42,8 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
   body.height = dev.height
   body.i = 1
   lwid = 1
-  label.height = 1
-  main.height = 1.5
+  label.height = .5
+  main.height = 1.2
   lhei = body.height
   
   if(!is.null(labColAbove)){
@@ -77,15 +77,21 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
     lmat <- cbind(lmat, c(rep(0, body.i-1), max(lmat)+1, rep(0, nrow(lmat)-body.i)))
     lwid <- c(dev.width - RowSideColors.size, RowSideColors.size)
   }
+  labRowSize = 0
   if (!is.null(rowsep.major.labels)) {
     labRowSize = 1
     lmat <- cbind(lmat, c(rep(0, body.i-1), max(lmat)+1, rep(0, nrow(lmat)-body.i)))
     lwid <- c(dev.width - RowSideColors.size - labRowSize, labRowSize)
   }
+  if(left_mai > 0){
+    lmat <- cbind(rep(0, nrow(lmat)), lmat)
+    lwid <- c(left_mai, dev.width - RowSideColors.size - labRowSize - left_mai)
+  }
   
   
-  print(lmat)
-  #print(lhei)
+#   print(lmat)
+#   print(lhei)
+#   print(lwid)
   
   
   
@@ -185,7 +191,7 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
   #draw title
   if(!is.null(main)){
     plot.new()
-    text(.5,.5, main, cex = 4)
+    text(.5,.5, main, cex = cex.main)
   }
   
   #draws column labels below column
@@ -246,7 +252,7 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
     xargs$side <- 1
     do.call(axis, xargs)
     if (!is.na(key.lab)) {
-      mtext(side = 1, key.lab, line = par("mgp")[1], padj = 0.5, 
+      mtext(side = 3, key.lab, line = 1, padj = 1, 
             cex = par("cex") * par("cex.lab"))
     }
   }
@@ -280,7 +286,6 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
 #         rsep_curr = nrow(x)
 #       }
       
-      #print(nrow(x))
       rsep_mid = (mean(c(rsep_prev, rsep_curr)))
       
       ypos = 1 - (rsep_mid / nrow(x))
