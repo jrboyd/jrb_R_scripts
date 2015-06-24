@@ -34,7 +34,6 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
     fudge = 0.037037037037
     plot(c(0+fudge*width, width-fudge * width), c(0+fudge*height, height-fudge * height), type = 'n', xlab = '', ylab = '', axes = F, )
   }
-  print(rowsep.major)
   
   dev.width = par('din')[1]
   dev.height = par('din')[2]
@@ -265,8 +264,6 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
   if(!is.null(rowsep.major.labels)){
     par(mai = rep(0,4))
     plot0()
-    print(rowsep.major)
-    print(rowsep.major.labels)
     for(i in 1:length(rowsep.major.labels)){
       rsep_prev = 0
       if(i > 1){
@@ -283,13 +280,10 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
 #         rsep_curr = nrow(x)
 #       }
       
-      print(paste(rsep_prev, rsep_curr))
       #print(nrow(x))
       rsep_mid = (mean(c(rsep_prev, rsep_curr)))
       
-      print(rsep_mid)
       ypos = 1 - (rsep_mid / nrow(x))
-      print(ypos)
       text(.5, ypos, rowsep.major.labels[i], adj = c(.5,.5) )
 #       text(.5, -.5/nrow(x), 'test', adj = c(.5,.5) )
 #       text(.5, .5/nrow(x), 'test', adj = c(.5,.5) )

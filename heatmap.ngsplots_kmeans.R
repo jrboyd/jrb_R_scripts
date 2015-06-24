@@ -24,8 +24,8 @@ heatmap.ngsplots = function(ngs_profiles, profiles_to_plot, nclust = 6, labels_b
   })
   
   #HARDCODED DEBUG STUFF
-#   prof = prof[1:100,]
-#   fg_toPlot = rownames(prof)[1]
+  #   prof = prof[1:100,]
+  #   fg_toPlot = rownames(prof)[1]
   
   
   cr = colorRamp(c('blue', 'black', 'yellow'))
@@ -120,7 +120,6 @@ heatmap.ngsplots = function(ngs_profiles, profiles_to_plot, nclust = 6, labels_b
     #insert_at = 1
     
     for(i in fg_indexes){
-      print(i)
       affected = rseps < i
       rseps[affected] = rseps[affected] + 1
       a = integer()
@@ -136,8 +135,20 @@ heatmap.ngsplots = function(ngs_profiles, profiles_to_plot, nclust = 6, labels_b
   }
   
   
-  res = heatmap.2.2(prof_ordered, RowSideColors = rColors[rownames(prof_ordered)], Rowv = F, Colv = F, dendrogram = 'n', trace = 'n', scale = 'n', labRow = '', labCol = labels, srtCol = 0, adjCol = c(.5,1), cexCol = 1, col = colors, symm = T, rowsep.major = rseps, colsep.minor = cseps, sepwidth.minor = 2, sepwidth.major = max(nrow(prof_ordered)/100,1), density.info = 'none', main = NULL, labColAbove = labColAbove, na.color = 'red', rowsep.major.labels = fg_label)
-  return(res)
+  tmp = heatmap.2.2(prof_ordered, RowSideColors = rColors[rownames(prof_ordered)], Rowv = F, Colv = F, dendrogram = 'n', trace = 'n', scale = 'n', labRow = '', labCol = labels, srtCol = 0, adjCol = c(.5,1), cexCol = 1, col = colors, symm = T, rowsep.major = rseps, colsep.minor = cseps, sepwidth.minor = 2, sepwidth.major = max(nrow(prof_ordered)/100,1), density.info = 'none', main = NULL, labColAbove = labColAbove, na.color = 'red', rowsep.major.labels = fg_label)
+  cluster_members = list()
+  for(i in 0:length(rseps)){
+    start = 1
+    if(i > 0) start = rseps[i] + 1
+    end = nrow(prof_ordered)
+    if(i < length(rseps)) end = rseps[i + 1]
+    
+#     print(start)
+#     print(end)
+    cluster_members[[i+1]] = rownames(prof_ordered)[start:end]
+  }
+  ngs_res = list(colors = unique(rColors), cluster_members = cluster_members, as_plotted = prof_ordered)
+  return(ngs_res)
 }
 
 cl = 'MCF10A'
@@ -156,5 +167,5 @@ for(tp in toPlot){
 
 #png(paste0('test8sidecol2_', cl, '.png'), width = 4, height = 8, units = 'in', res = 450)
 nclust = 3
-  res = heatmap.ngsplots(ngs_profiles, toPlot, nclust = 3, labels_below = hm, labels_above = cl, fg_toPlot = 1:3, fg_label = c('selected', 1:nclust))
+res = heatmap.ngsplots(ngs_profiles, toPlot, nclust = 3, labels_below = hm, labels_above = cl, fg_toPlot = 1:3, fg_label = c('selected', 1:nclust))
 #dev.off()
