@@ -51,7 +51,7 @@ runAffyPCAexample = function (){
   geneList = plotPCA(data, conditionLabels, replicateLabels,n = 3, title = "PCA Example")
 }
 
-plotPCA=function(data, conditionLabels, replicateLabels, secondaryConditionLabels = NA, n = 6, title = "", key = TRUE){
+plotPCA=function(data, conditionLabels, replicateLabels, secondaryConditionLabels = NA, n = 6, title = "", key = TRUE, displayReps = F, do3D = F, doVarPlot = F){
   ## performs PCA and constructs a table of scatterplots representing results
   #  args
   #  data, a matrix like object with genes are rows and condition/replicates as columns
@@ -83,39 +83,40 @@ plotPCA=function(data, conditionLabels, replicateLabels, secondaryConditionLabel
   nReps = length(unique(replicateLabels))
   #modify how color groups are set if you don't like the colors
   pointGroups=1:length(uniqueSecondary)
-#   clrRamp = colorRamp(colors = c('darkorange','red','blue')) #replaced color ramp with color brewer
-#   colorGroups=rgb(clrRamp((1:nCond1-1)/(nCond1-1))/255)
+  #   clrRamp = colorRamp(colors = c('darkorange','red','blue')) #replaced color ramp with color brewer
+  #   colorGroups=rgb(clrRamp((1:nCond1-1)/(nCond1-1))/255)
   colorGroups = RColorBrewer::brewer.pal(n = length(uniqueGroups), name = 'Dark2')
   names(colorGroups)=uniqueGroups
   names(pointGroups)=uniqueSecondary
   condPrin=prcomp(t(data))
   
-  print("Variance explained by PC:")
+  #print("Variance explained by PC:")
   cumVar = paste(format(cumsum((condPrin$sdev)^2) / sum(condPrin$sdev^2),digits = 3,scientific = F ), collapse = '\n')
   indiVar = paste(substr(format(((condPrin$sdev)^2) / sum(condPrin$sdev^2),digits = 3,scientific = F ),start = 1,stop = 5), collapse = '\n')
-  layout(1)
-  plot(x = 0:1, y = 0:1, type="n", axes=F, xlab="", ylab="")
-  text("Variance explained by PC:",x = .2,y = .9, adj = c(0,1))
-  text(paste(1:length(condPrin$sdev), collapse = '\n'),x = .1,y = .7, adj = c(0,1))
-  text(indiVar,x = .2,y = .7, adj = c(0,1))
-  text("Cumulative",x = .35,y = .8, adj = c(0,1))
-  text(cumVar,x = .35,y = .7,adj = c(0,1))
-  
+  if(doVarPlot){
+    layout(1)
+    plot(x = 0:1, y = 0:1, type="n", axes=F, xlab="", ylab="")
+    text("Variance explained by PC:",x = .2,y = .9, adj = c(0,1))
+    text(paste(1:length(condPrin$sdev), collapse = '\n'),x = .1,y = .7, adj = c(0,1))
+    text(indiVar,x = .2,y = .7, adj = c(0,1))
+    text("Cumulative",x = .35,y = .8, adj = c(0,1))
+    text(cumVar,x = .35,y = .7,adj = c(0,1))
+  }
   
   geneImpact=condPrin$rotation
-  
-  layout(1:2, heights = c(.1,1))
-  #dev.off()
-  par(mai = rep(0,4))
-  plot(c(0,1), type = 'n', axes = F, xlab = '', ylab = '')
-  legend(x = 'center', legend = uniqueMeta,, col = colorGroups[uniqueMeta],pch = pointGroups[uniqueMeta], horiz = T)
-  scatterplot3d(condPrin$x[,1],condPrin$x[,2],condPrin$x[,3], 
-            pch = pointGroups[secondaryConditionLabels],
-            color = colorGroups[conditionLabels],
-            type='h',
-            xlab = 'PC1',ylab = 'PC2',zlab = 'PC3',
-            lwd=2,axis=T)
-  
+  if(do3D){
+    layout(1:2, heights = c(.1,1))
+    #dev.off()
+    par(mai = rep(0,4))
+    plot(c(0,1), type = 'n', axes = F, xlab = '', ylab = '')
+    legend(x = 'center', legend = uniqueMeta,, col = colorGroups[uniqueMeta],pch = pointGroups[uniqueMeta], horiz = T)
+    scatterplot3d(condPrin$x[,1],condPrin$x[,2],condPrin$x[,3], 
+                  pch = pointGroups[secondaryConditionLabels],
+                  color = colorGroups[conditionLabels],
+                  type='h',
+                  xlab = 'PC1',ylab = 'PC2',zlab = 'PC3',
+                  lwd=2,axis=T)
+  }
   #plot3d(condPrin$x[,1],condPrin$x[,2],condPrin$x[,3],pch =  pointGroups[secondaryConditionLabels],col=colorGroups[conditionLabels],size = 10,xlab = 'PC1',ylab = 'PC2',zlab = 'PC3',axes=T)
   #   
   
@@ -150,7 +151,16 @@ plotPCA=function(data, conditionLabels, replicateLabels, secondaryConditionLabel
     for(r in 1:n){
       if(c != r){
         #modify this line to change how the scatterplots are drawn
-        plot(condPrin$x[,c],condPrin$x[,r],col=colorGroups[conditionLabels],pch=pointGroups[secondaryConditionLabels],lwd=2,xlab="",ylab="",xaxt='n',yaxt='n')
+        if(displayReps){#draw points as colored text
+          plot(condPrin$x[,c],condPrin$x[,r], type = 'n', xlab="",ylab="",xaxt='n',yaxt='n')  
+          for(i in 1:length(replicateLabels)){
+            text(condPrin$x[i,c], condPrin$x[i,r], replicateLabels[i], col=colorGroups[conditionLabels[i]] )
+          }
+          
+        }else{#draw points as colored shapes
+          plot(condPrin$x[,c],condPrin$x[,r],col=colorGroups[conditionLabels],pch=pointGroups[secondaryConditionLabels],lwd=2,xlab="",ylab="",xaxt='n',yaxt='n')  
+        }
+        
       }
       else{
         boxPlotData=list()#matrix(0,ncol = nConditions, nrow = nReps)
