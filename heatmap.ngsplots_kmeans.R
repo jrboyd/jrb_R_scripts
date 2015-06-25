@@ -309,7 +309,7 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
 library('reshape')
 library('ggplot2')
 
-heatmap.ngsplots = function(ngs_profiles, main_title = NULL, profiles_to_plot, nclust = 6, labels_below = NA, labels_above = NA, fg_toPlot = character(), fg_label = NULL, sortClustersByTotal = F, ...){
+heatmap.ngsplots = function(ngs_profiles, main_title = NULL, profiles_to_plot, nclust = 6, labels_below = NA, labels_above = NA, fg_toPlot = character(), fg_label = NULL, sortClustersByTotal = F, hmapColors = c('royalblue1', 'black', 'yellow'), ...){
   if(length(labels_below) < 2 && is.na(labels_below)){
     labels_below = profiles_to_plot
   }
@@ -331,7 +331,7 @@ heatmap.ngsplots = function(ngs_profiles, main_title = NULL, profiles_to_plot, n
   #   fg_toPlot = rownames(prof)[1]
   
   
-  cr = colorRamp(c('blue', 'black', 'yellow'))
+  cr = colorRamp(hmapColors)
   tmp = 0:100 / 100
   colors = rgb(cr(tmp)/255)
   
@@ -448,6 +448,13 @@ heatmap.ngsplots = function(ngs_profiles, main_title = NULL, profiles_to_plot, n
       #rColors = rColors[new_order]
       
     }
+    
+    #sort the new cluster
+    o = order(rowSums(prof_ordered[1:(rseps[1]), ]), decreasing = T)
+    prof_ordered[1:(rseps[1]), ] = prof_ordered[1:(rseps[1]), ][o,]
+    
+    #may be sufficient to reverse new cluster
+    #prof_ordered[1:(rseps[1]), ] = prof_ordered[(rseps[1]):1, ]
   }
   
   
@@ -486,6 +493,16 @@ for(tp in toPlot){
 
 #png(paste0('test8sidecol2_', cl, '.png'), width = 4, height = 8, units = 'in', res = 450)
 nclust = 3
-res = heatmap.ngsplots(ngs_profiles, main_title = 'title', toPlot, nclust = nclust, labels_below = hm, labels_above = cl, 
+pdf(file = NULL)
+res = heatmap.ngsplots(ngs_profiles,# hmapColors = c('#2166ac', 'black', '#b2182b'),
+                       main_title = 'title', toPlot, nclust = nclust, labels_below = hm, labels_above = cl, 
                        fg_toPlot = c(9,2), fg_label = c('selected', 1:nclust), sortClustersByTotal = T)
+dev.off()
+res = heatmap.ngsplots(ngs_profiles,# hmapColors = c('#2166ac', 'black', '#b2182b'),
+                       main_title = 'title', toPlot, nclust = nclust, labels_below = hm, labels_above = cl, 
+                       fg_toPlot = c(9,2), fg_label = paste(sapply(res[[1]], length), 'genes'), sortClustersByTotal = T)
+
+
 #dev.off()
+
+
