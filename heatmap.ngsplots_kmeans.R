@@ -309,7 +309,7 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE,
 library('reshape')
 library('ggplot2')
 
-heatmap.ngsplots = function(ngs_profiles, main_title = NULL, profiles_to_plot, nclust = 6, labels_below = NA, labels_above = NA, fg_toPlot = character(), fg_label = NULL, ...){
+heatmap.ngsplots = function(ngs_profiles, main_title = NULL, profiles_to_plot, nclust = 6, labels_below = NA, labels_above = NA, fg_toPlot = character(), fg_label = NULL, sortClustersByTotal = F, ...){
   if(length(labels_below) < 2 && is.na(labels_below)){
     labels_below = profiles_to_plot
   }
@@ -351,11 +351,11 @@ heatmap.ngsplots = function(ngs_profiles, main_title = NULL, profiles_to_plot, n
   labels[labels_loc] = labels_below
   set.seed(1)
   kmclust = kmeans(prof, centers = nclust, iter.max = 10)
-  o = order(kmclust$cluster)
+  o = order(kmclust$cluster)#sort prof to be in cluster number order
   prof = prof[o,, drop = F]
-  kmclust$cluster = kmclust$cluster[o]
+  kmclust$cluster = kmclust$cluster[o]#keep cluster assignment sorted in same order as prof
   
-  for(i in 1:nclust){
+  for(i in 1:nclust){#sort within each cluster by rowSum
     size = kmclust$size
     start = 1
     if(i > 1){
@@ -366,8 +366,7 @@ heatmap.ngsplots = function(ngs_profiles, main_title = NULL, profiles_to_plot, n
     o = order(rowSums(prof[start:end,,drop = F]), decreasing = T)
     prof[start:end,] = prof[start:end,,drop = F][o,, drop = F]
   }
-  hiclust = hclust(dist(kmclust$centers))
-  kmclust_order = hiclust$order
+  
   prof_ordered = matrix(0, ncol = ncol(prof), nrow = 0)
   
   
@@ -380,14 +379,27 @@ heatmap.ngsplots = function(ngs_profiles, main_title = NULL, profiles_to_plot, n
     end = sum(kmclust$size[1:(i)])
     return(prof[start:end,])
   }
-  for(i in kmclust_order){#sort k means clusters by their center hierarchical clutering
-    new_cluster = get_kmclust(i)
-    start = nrow(prof_ordered) + 1
-    prof_ordered = rbind(prof_ordered, new_cluster)
-    end = nrow(prof_ordered)
-    #kmclust$cluster[start:end] = i
-    
+  if(sortClustersByTotal){#sort clusters by total of their centers
+    kmclust_order = order(apply(kmclust$centers, 1, sum), decreasing = T)
+    for(i in kmclust_order){#sort k means clusters by their center hierarchical clutering
+      new_cluster = get_kmclust(i)
+      start = nrow(prof_ordered) + 1
+      prof_ordered = rbind(prof_ordered, new_cluster)
+      end = nrow(prof_ordered)
+      #kmclust$cluster[start:end] = i
+    }
+  }else{
+    hiclust = hclust(dist(kmclust$centers))
+    kmclust_order = hiclust$order
+    for(i in kmclust_order){#sort k means clusters by their center hierarchical clutering
+      new_cluster = get_kmclust(i)
+      start = nrow(prof_ordered) + 1
+      prof_ordered = rbind(prof_ordered, new_cluster)
+      end = nrow(prof_ordered)
+      #kmclust$cluster[start:end] = i
+    }
   }
+  
   
   rseps = 1:(nclust-1)#cacluated row seperations
   kmclust$size = kmclust$size[kmclust_order]
@@ -408,7 +420,7 @@ heatmap.ngsplots = function(ngs_profiles, main_title = NULL, profiles_to_plot, n
   rColors = rColorChoices[kmclust$cluster[rownames(prof_ordered)]]
   names(rColors) = rownames(prof_ordered)
   #fg_toPlot = intersect(fg_toPlot, rownames(prof_ordered))
-  if(length(fg_toPlot) > 0){
+  if(length(fg_toPlot) > 0){#extract fg_plot as special cluster
     rseps = c(0, rseps)
     rColors[fg_toPlot] = 'white'
     #move each fg_toPlot to top of profile, reduce rseps accordingly
@@ -457,14 +469,16 @@ heatmap.ngsplots = function(ngs_profiles, main_title = NULL, profiles_to_plot, n
 }
 
 cl = 'MCF10A'
-hm = c('H3K27AC','H3K27ME3','H3K4AC', 'H3K4ME3', 'H4K20ME3')
+hm = c('H3K27AC','H3K27ME3','H3K4AC') #, 'H3K4ME3', 'H4K20ME3')
 toPlot = paste(cl, hm, sep = '_')
 ngs_profiles = list()
-nr = 20
-nc = 5
+nr = 10
+nc = 49
 for(tp in toPlot){
   dat = matrix(runif(nr * nc, 0, 100), nrow = nr, ncol = nc)
   rownames(dat) = 1:nrow(dat)
+  reduce = runif(nr/2, 1, nr)
+  dat[reduce,] = dat[reduce,] / 5
   ngs_profiles[[tp]] = dat
 }
 
@@ -472,5 +486,6 @@ for(tp in toPlot){
 
 #png(paste0('test8sidecol2_', cl, '.png'), width = 4, height = 8, units = 'in', res = 450)
 nclust = 3
-res = heatmap.ngsplots(ngs_profiles, main_title = 'title', toPlot, nclust = 3, labels_below = hm, labels_above = cl, fg_toPlot = 1:3, fg_label = c('selected', 1:nclust))
+res = heatmap.ngsplots(ngs_profiles, main_title = 'title', toPlot, nclust = nclust, labels_below = hm, labels_above = cl, 
+                       fg_toPlot = c(9,2), fg_label = c('selected', 1:nclust), sortClustersByTotal = T)
 #dev.off()
