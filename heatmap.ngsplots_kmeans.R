@@ -8,7 +8,20 @@
 library('reshape')
 library('ggplot2')
 
-heatmap.ngsplots = function(ngs_profiles, main_title = NULL, profiles_to_plot, nclust = 6, labels_below = NA, labels_above = NA, fg_toPlot = character(), labels_right = NA, sortClustersByTotal = F, hmapColors = c('royalblue1', 'black', 'yellow'), labelWithCounts = F, fg_label = NA, label_clusters = T, ...){
+heatmap.ngsplots = function(ngs_profiles, 
+                            main_title = NULL, 
+                            profiles_to_plot, 
+                            nclust = 6, 
+                            labels_below = NA, 
+                            labels_above = NA, 
+                            fg_toPlot = character(), 
+                            labels_right = NA, 
+                            sortClustersByTotal = F, 
+                            hmapColors = c('royalblue1', 'black', 'yellow'), 
+                            labelWithCounts = F, 
+                            fg_label = NA, 
+                            label_clusters = T){
+  
   if(length(labels_below) < 2 && is.na(labels_below)){
     labels_below = profiles_to_plot
   }
@@ -174,17 +187,17 @@ heatmap.ngsplots = function(ngs_profiles, main_title = NULL, profiles_to_plot, n
   #print(kmclust)
   #print(rseps)
   extra_spacer = 2
-  hidden = heatmap.2.2(prof_ordered,
+  hidden = heatmap.2.2(prof_ordered, key.lab = 'logFE', #key.par = list(mai = c(.5,0,0,0)),
                        RowSideLabels = RowSideLabels,
                        RowSideColors = rColors[rownames(prof_ordered)],
-                       labCol = labels.below, srtCol = 0, adjCol = c(.5,1), cexCol = 1, col = colors, symm = T, 
+                       labels.below = labels.below, cexCol = 1, cexRow = 1, col = colors, 
                        rowsep.major = c(rep(rseps[1], extra_spacer), rseps), 
                        colsep.minor = cseps, 
                        sepwidth.minor = 2, 
                        sepwidth.major = max(nrow(prof_ordered)/100,1), 
                        labels.above = labels.above, 
                        na.color = 'red', 
-                       rowsep.major.labels = c(labels_right[1], rep('', extra_spacer), labels_right[2:length(labels_right)]), 
+                       labels.rowsep = c(labels_right[1], rep('', extra_spacer), labels_right[2:length(labels_right)]), 
                        main = main_title)
   cluster_members = list()
   #print(nrow(prof_ordered))
@@ -202,32 +215,49 @@ heatmap.ngsplots = function(ngs_profiles, main_title = NULL, profiles_to_plot, n
   return(ngs_res)
 }
 
-
+default.colors = function(){
+  
+}
 
 
 #dev.off()
 #dummy out tracing, dummy out clustering
-heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE, RowSideLabels = NA,
-                        distfun = dist, hclustfun = hclust, dendrogram = c("both", 
-                                                                           "row", "column", "none"), reorderfun = function(d, w) reorder(d, 
-                                                                                                                                         w), symm = FALSE, scale = c("none", "row", "column"), 
-                        na.rm = TRUE, revC = identical(Colv, "Rowv"), add.expr, breaks, 
-                        symbreaks = any(x < 0, na.rm = TRUE) || scale != "none", 
-                        col = "heat.colors", colsep.minor = -1, colsep.major = -1, rowsep.minor = -1, rowsep.major = -1, sepcolor = "white", 
-                        sepwidth.minor = 1, sepwidth.major = 3, cellnote, notecex = 1, notecol = "cyan", 
-                        na.color = par("bg"), trace = c("column", "row", "both", 
-                                                        "none"), tracecol = "cyan", hline = median(breaks), vline = median(breaks), 
-                        linecol = tracecol, mar.top = 2, mar.left = 2, mar.bot = 5, mar.right = 5, ColSideColors, RowSideColors = NULL, 
-                        cexRow = 0.2 + 1/log10(nr), cexCol = 0.2 + 1/log10(nc), labRow = NULL,
-                        labCol = NULL, labels.above = NULL, srtRow = NULL, srtCol = NULL, adjRow = c(0, 
-                                                                                                     NA), adjCol = c(.5, .5), offsetRow = 0.5, offsetCol = 0.5, 
-                        colRow = NULL, colCol = NULL, key = TRUE, keysize = .1, 
-                        density.info = c("histogram", "density", "none"), denscol = tracecol, 
-                        symkey = any(x < 0, na.rm = TRUE) || symbreaks, densadj = 0.25, 
-                        key.title = NULL, key.lab = NA, key.ylab = NULL, key.xtickfun = NULL, 
-                        key.ytickfun = NULL, key.par = list(), main = NULL, xlab = NULL, 
-                        ylab = NULL, lmat = NULL, lhei = 1, lwid = NULL, extrafun = NULL, rowsep.major.labels = NULL, left_mai = .7, cex.main = 2,
-                        ...) 
+heatmap.2.2 = function (x, 
+                        col, 
+                         
+                        #dividing up the plot
+                        colsep.minor = -1, 
+                        colsep.major = -1, 
+                        rowsep.minor = -1, 
+                        rowsep.major = -1, 
+                        sepwidth.minor = 1, 
+                        sepwidth.major = 3, 
+                        na.color = par("bg"), 
+                        
+                        #color and label for clusters
+                        RowSideLabels = NA,
+                        RowSideColors = NULL, 
+                        
+                        #title
+                        main = NULL,
+                        cex.main = 2,
+                        
+                        #labelling rows and columns
+                        cexRow = 0.2 + 1/log10(nr), 
+                        cexCol = 0.2 + 1/log10(nc),
+                        labels.below = NULL, 
+                        labels.above = NULL, 
+                        labels.rowsep = NULL,
+                        
+                        #left margin size
+                        left_mai = .7,
+                        
+                        #color key
+                        key = T, 
+                        key.height = 1,
+                        key.lab = 'Color Key', 
+                        key.xtickfun = NULL, 
+                        key.par = list()) 
 {
   x.original = x
   rowsep.minor.original = rowsep.minor
@@ -270,13 +300,13 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE, RowSi
     lhei = c(main.height, lhei)
     body.iy = body.iy + 1
   }
-  if(!is.null(labCol)){
+  if(!is.null(labels.below)){
     lmat = rbind(lmat, max(lmat) + 1)
     lhei[body.iy] = lhei[body.iy] - label.height
     lhei = c(lhei, label.height)
   }
   if(key){
-    key.height = 1
+    
     lmat = rbind(lmat, max(lmat) + 1)
     lhei[body.iy] = lhei[body.iy] - key.height
     lhei = c(lhei, key.height)
@@ -291,7 +321,7 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE, RowSi
     lwid <- c(lwid, RowSideColors.size)
   }
   labRowSize = 0
-  if (!is.null(rowsep.major.labels)) {
+  if (!is.null(labels.rowsep)) {
     labRowSize = 1
     lmat <- cbind(lmat, c(rep(0, body.iy-1), max(lmat)+1, rep(0, nrow(lmat)-body.iy)))
     lwid[body.ix] = lwid[body.ix] - labRowSize
@@ -304,16 +334,33 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE, RowSi
     body.ix = body.ix + 1
   }
   
-  
   print(lmat)
   print(lhei)
   print(lwid)
   
-  
-  
   layout(lmat, heights = lhei, widths = lwid)
   
+  breaks <- length(col) + 1
+  symbreaks = any(x < 0, na.rm = TRUE)
+  symkey = any(x < 0, na.rm = TRUE) || symbreaks
   
+  if (length(breaks) == 1) {
+    if (!symbreaks) 
+      breaks <- seq(min(x, na.rm = T), max(x, na.rm = T), 
+                    length = breaks)
+    else {
+      extreme <- max(abs(x), na.rm = TRUE)
+      breaks <- seq(-extreme, extreme, length = breaks)
+    }
+  }
+  nbr <- length(breaks)
+  ncol <- length(breaks) - 1
+  if (class(col) == "function") 
+    col <- col(ncol)
+  min.breaks <- min(breaks)
+  max.breaks <- max(breaks)
+  x[x < min.breaks] <- min.breaks
+  x[x > max.breaks] <- max.breaks
   
   x = x[nrow(x):1,]#reverse so heatmap top row is top row of input matrix
   RowSideColors = rev(RowSideColors)
@@ -327,7 +374,7 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE, RowSi
     colsep.minor[affected] <<- colsep.minor[affected] + n
     affected = colsep.major > i
     colsep.major[affected] <<- colsep.major[affected] + n
-    if(!is.null(labCol)) labCol <<- c(labCol[1:i], rep('', n), labCol[(i + 1):length(labCol)])
+    if(!is.null(labels.below)) labels.below <<- c(labels.below[1:i], rep('', n), labels.below[(i + 1):length(labels.below)])
     if(!is.null(labels.above)) labels.above <<- c(labels.above[1:i], rep('', n), labels.above[(i + 1):length(labels.above)])
   }
   
@@ -379,11 +426,14 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE, RowSi
   nr = nrow(x)
   par(mai = rep(0,4))
   #plots the body of the heatap
-  image(0:nc, 0:nr, t(x), xlim = c(0, nc), ylim = c(0, nr), axes = FALSE, xlab = "", ylab = "", col = col, 
-        breaks = breaks, ...)
+  image(0:nc, 0:nr, t(x), xlim = c(0, nc), ylim = c(0, nr), axes = FALSE, xlab = "", ylab = "", col = col, breaks = breaks)
   
   #print(dim(x))
   #plots column labels above column
+  srtCol = 0
+  adjCol = c(.5,1)
+  colCol = NULL
+  
   apply_col_labels = function(col_labels, yshift = .5, yadj = .5){
     plot0(ncol(x))
     if (is.null(srtCol) && is.null(colCol)) 
@@ -413,34 +463,13 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE, RowSi
   }
   
   #draws column labels below column
-  if(!is.null(labCol)){
-    apply_col_labels(labCol, .9, 1)
+  if(!is.null(labels.below)){
+    apply_col_labels(labels.below, .9, 1)
   }
-  if (missing(breaks) || is.null(breaks) || length(breaks) < 
-        1) {
-    if (missing(col) || is.function(col)) 
-      breaks <- 16
-    else breaks <- length(col) + 1
-  }
-  if (length(breaks) == 1) {
-    if (!symbreaks) 
-      breaks <- seq(min(x, na.rm = na.rm), max(x, na.rm = na.rm), 
-                    length = breaks)
-    else {
-      extreme <- max(abs(x), na.rm = TRUE)
-      breaks <- seq(-extreme, extreme, length = breaks)
-    }
-  }
-  nbr <- length(breaks)
-  ncol <- length(breaks) - 1
-  if (class(col) == "function") 
-    col <- col(ncol)
-  min.breaks <- min(breaks)
-  max.breaks <- max(breaks)
-  x[x < min.breaks] <- min.breaks
-  x[x > max.breaks] <- max.breaks
+  
+  
   if (key) {
-    mai <- c(.5, .2, .2, .2)
+    mai <- c(.5, 0,0,0)
     par(mai = mai, cex = 0.75, mgp = c(2, 1, 0))
     if (length(key.par) > 0) 
       do.call(par, key.par)
@@ -494,16 +523,16 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE, RowSi
       #print(center)
       rowLab = rev(RowSideLabels)[i]
       
-      text(.5,center, rowLab, adj = c(.5,.5))
+      text(.5,center, rowLab, adj = c(.5,.5), cex = cexRow)
       
     }
     #par(xpd = NA)
     
   }
-  if(!is.null(rowsep.major.labels)){
+  if(!is.null(labels.rowsep)){
     par(mai = rep(0,4))
     plot0(height = nr)
-    for(i in 1:length(rowsep.major.labels)){
+    for(i in 1:length(labels.rowsep)){
       rsep_prev = 1
       if(i > 1){
         rsep_prev = rowsep.major[i - 1] + sepwidth.major
@@ -518,7 +547,7 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE, RowSi
       rsep_mid = (mean(c(rsep_prev, rsep_curr)))
       ypos = nr - rsep_mid + 1
       #print(paste(ypos, '-'))
-      text(.5, ypos, rowsep.major.labels[i], adj = c(.5,.5) )
+      text(.5, ypos, labels.rowsep[i], adj = c(.5,.5), cex = cexRow )
     }
   }
 }
