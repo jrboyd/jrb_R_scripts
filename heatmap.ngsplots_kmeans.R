@@ -55,7 +55,7 @@ heatmap.ngsplots = function(ngs_profiles, main_title = NULL, profiles_to_plot, n
   rColorChoices = RColorBrewer::brewer.pal(nclust, 'Dark2')#set cluster id colors
   rColors = rColorChoices[kmclust$cluster[rownames(prof)]]
   names(rColors) = rownames(prof)#colors will be accessed by rowname of prof, do not need sorted
-
+  
   if(length(fg_toPlot) > 0){#extract fg_plot as special cluster
     #rseps = c(0, rseps)#add an
     kmclust$cluster[fg_toPlot] = 0#change cluster of fg
@@ -95,15 +95,21 @@ heatmap.ngsplots = function(ngs_profiles, main_title = NULL, profiles_to_plot, n
     end = sum(kmclust$size[1:(i)])
     return(prof[start:end,])
   }
-  kmclust_order = 1:nclust
-
   
-  if(length(fg_toPlot) > 0){#move 1 to beginning
-    #not_1 = kmclust_order != 1
-    #kmclust_order = c(1, kmclust_order[not_1])
-    km_dist = as.matrix(dist(kmclust$centers))
-    o = order(km_dist[,1])
-    kmclust_order = o
+  kmclust_order = 1:nclust
+  if(length(fg_toPlot) > 0){
+    sortByDist = F
+    if(sortByDist){
+      km_dist = as.matrix(dist(kmclust$centers))
+      o = order(km_dist[,1])
+      kmclust_order = o
+    }else{
+      kmclust_order = order(apply(kmclust$centers, 1, sum), decreasing = T)
+      not_1 = kmclust_order != 1#move 1 to beginning
+      kmclust_order = c(1, kmclust_order[not_1])
+    }
+    
+    #    
   }else{
     if(sortClustersByTotal){#sort clusters by total of their centers
       kmclust_order = order(apply(kmclust$centers, 1, sum), decreasing = T)
@@ -244,58 +250,64 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE, RowSi
   
   lmat = 1
   body.height = dev.height
-  body.i = 1
-  lwid = 1
+  body.width = dev.width
+  body.iy = 1
+  body.ix = 1
+  lwid = dev.width
   label.height = .5
   main.height = 1.2
   lhei = body.height
   
   if(!is.null(labels.above)){
     lmat = rbind(max(lmat) + 1, lmat)
-    lhei[body.i] = lhei[body.i] - label.height
+    lhei[body.iy] = lhei[body.iy] - label.height
     lhei = c(label.height, lhei)
-    body.i = body.i + 1
+    body.iy = body.iy + 1
   }
   if(!is.null(main)){
     lmat = rbind(max(lmat) + 1, lmat)
-    lhei[body.i] = lhei[body.i] - main.height
+    lhei[body.iy] = lhei[body.iy] - main.height
     lhei = c(main.height, lhei)
-    body.i = body.i + 1
+    body.iy = body.iy + 1
   }
   if(!is.null(labCol)){
     lmat = rbind(lmat, max(lmat) + 1)
-    lhei[body.i] = lhei[body.i] - label.height
+    lhei[body.iy] = lhei[body.iy] - label.height
     lhei = c(lhei, label.height)
   }
   if(key){
     key.height = 1
     lmat = rbind(lmat, max(lmat) + 1)
-    lhei[body.i] = lhei[body.i] - key.height
+    lhei[body.iy] = lhei[body.iy] - key.height
     lhei = c(lhei, key.height)
   }
   RowSideColors.size = 0
   if (!is.null(RowSideColors)) {
     if (!is.character(RowSideColors) || length(RowSideColors) != nrow(x)) 
       stop("'RowSideColors' must be a character vector of length nrow(x)")
-    RowSideColors.size = .8
-    lmat <- cbind(lmat, c(rep(0, body.i-1), max(lmat)+1, rep(0, nrow(lmat)-body.i)))
-    lwid <- c(dev.width - RowSideColors.size, RowSideColors.size)
+    RowSideColors.size = 1.5
+    lmat <- cbind(lmat, c(rep(0, body.iy-1), max(lmat)+1, rep(0, nrow(lmat)-body.iy)))
+    lwid[body.ix] = lwid[body.ix] - RowSideColors.size
+    lwid <- c(lwid, RowSideColors.size)
   }
   labRowSize = 0
   if (!is.null(rowsep.major.labels)) {
     labRowSize = 1
-    lmat <- cbind(lmat, c(rep(0, body.i-1), max(lmat)+1, rep(0, nrow(lmat)-body.i)))
-    lwid <- c(dev.width - RowSideColors.size - labRowSize, labRowSize)
+    lmat <- cbind(lmat, c(rep(0, body.iy-1), max(lmat)+1, rep(0, nrow(lmat)-body.iy)))
+    lwid[body.ix] = lwid[body.ix] - labRowSize
+    lwid <- c(lwid, labRowSize)
   }
   if(left_mai > 0){
     lmat <- cbind(rep(0, nrow(lmat)), lmat)
-    lwid <- c(left_mai, dev.width - RowSideColors.size - labRowSize - left_mai)
+    lwid[body.ix] = lwid[body.ix] - left_mai
+    lwid <- c(left_mai, lwid)
+    body.ix = body.ix + 1
   }
   
   
-  #   print(lmat)
-  #   print(lhei)
-  #   print(lwid)
+  print(lmat)
+  print(lhei)
+  print(lwid)
   
   
   
@@ -475,13 +487,17 @@ heatmap.2.2 = function (x, Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE, RowSi
     cluster_ids = vals[,1]
     names(cluster_ids) = 1:length(cluster_ids)
     cluster_ids = cluster_ids[!is.na(cluster_ids)]
+    par(xpd = NA)
     for(i in 1:length(RowSideLabels)){
       keep = (cluster_ids == cluster_levels[i])
       center = mean(as.numeric(names(keep[keep])))
       #print(center)
       rowLab = rev(RowSideLabels)[i]
+      
       text(.5,center, rowLab, adj = c(.5,.5))
+      
     }
+    #par(xpd = NA)
     
   }
   if(!is.null(rowsep.major.labels)){
