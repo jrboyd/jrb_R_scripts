@@ -1,4 +1,5 @@
 plot.hmap_res_lists = function(hmap_res, nper_column = 50, nper_row = 10, cex = 1, col_spacing = 1, row_spacing = 1){
+  layout(1)
   res = hmap_res
   class_members = res$cluster_members
   class_colors = res$colors

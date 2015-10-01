@@ -8,6 +8,7 @@
 library('png')
 library('reshape')
 library('ggplot2')
+library('gplots')
 
 plot0 = function(width = 1, height = 1){
   fudge = 0.037037037037
@@ -31,6 +32,7 @@ stopRasterMode = function(mai = NA){
 
 heatmap.ngsplots = function(ngs_profiles, 
                             main_title = NULL, 
+                            lmat_custom = NULL,
                             profiles_to_plot = NA, 
                             nclust = 6, 
                             labels_below = NA, 
@@ -38,7 +40,7 @@ heatmap.ngsplots = function(ngs_profiles,
                             fg_toPlot = character(), 
                             labels_right = NA, 
                             sortClustersByTotal = F, 
-                            hmapColors = c('royalblue1', 'royalblue1', 'black', 'yellow'), 
+                            hmapColors = c('royalblue1', 'black', 'yellow'), 
                             labelWithCounts = F, 
                             fg_label = NA, 
                             label_clusters = T,
@@ -46,7 +48,8 @@ heatmap.ngsplots = function(ngs_profiles,
                             key.cex = 1.3,
                             cex.main = 2.5,
                             cex.row = 1.3,
-                            cex.col = 2){
+                            cex.col = 2,
+                            extraData = NULL){
   if(length(profiles_to_plot) == 1 && is.na(profiles_to_plot)){
     profiles_to_plot = names(ngs_profiles)
   }
@@ -107,20 +110,75 @@ heatmap.ngsplots = function(ngs_profiles,
     rownames(kmclust$centers) = 1:nclust
   }
   
-  o = order(kmclust$cluster)#sort prof to be in cluster number order
-  prof = prof[o,, drop = F]
-  kmclust$cluster = kmclust$cluster[o]#keep cluster assignment sorted in same order as prof
+  #   o = order(kmclust$cluster)#sort prof to be in cluster number order
+  #   prof = prof[o,, drop = F]
+  #   kmclust$cluster = kmclust$cluster[o]#keep cluster assignment sorted in same order as prof
+  
+  init_clust_data = function(clust, data){
+    #initize cluster object
+    #add data
+    #sort by cluster id
+    #add nclust
+    o = order(clust$cluster)
+    clust$data = data[o,]
+    names(clust$cluster) = NULL
+    clust$cluster = clust$cluster[o]
+    clust$nclust = length(clust$size)
+    return(clust)
+  }
+  fetch_clust = function(clust, i){
+    #returns the ith cluster
+    if(length(clust$size) < i) stop('fetch_clust i greater than nclust')
+    keep = clust$cluster == i
+    return(clust$data[keep,, drop = F])
+  }
+  move_clust = function(clust, i_tomove, i_dest){
+    #removes i_tomove and inserts it at i_dest
+    #updates data, cluster, centers, and size
+    if(clust$nclust < i_tomove) stop('move_clust i_tomove greater than nclust')
+    if(clust$nclust < i_dest) stop('move_clust i_dest greater than nclust')
+    curr_o = 1:clust$nclust
+    new_o = curr_o[curr_o != i_tomove]
+    new_o = c(new_o[1:length(new_o) < i_dest], i_tomove, new_o[1:length(new_o) > i_dest - 1]); new_o
+    new_data = matrix(0, nrow = 0, ncol = ncol(clust$data))
+    new_cluster = integer()
+    hidden = sapply(new_o, function(x){
+      keep = clust$cluster == x
+      new_data <<- rbind(new_data, clust$data[keep,])
+      new_cluster <<- c(new_cluster, clust$cluster[keep])
+    })
+    clust$data = new_data
+    clust$cluster = new_cluster
+    clust$centers = clust$centers[new_o,]
+    clust$size = clust$size[new_o]
+    
+    dict = 1:clust$nclust
+    names(dict) = new_o
+    
+    clust$cluster = dict[as.character(clust$cluster)]
+    rownames(clust$centers) = 1:clust$nclust
+    return(clust)
+  }
+  replace_clust = function(clust, i, new_datai){
+    #essentially removes cluster i and insert new_data in its place
+    clust$size[i] = nrow(new_datai)
+    clust$centers[i,] = colMeans(new_datai)
+    before = clust$cluster < i
+    after = clust$cluster > i
+    data = rbind(clust$data[before,], new_datai, clust$data[after,])
+    clust$data = data
+    clusters = c(clust$cluster[before], rep(i, nrow(new_datai)) ,clust$cluster[after])
+    clust$cluster = clusters
+    return(clust)
+  }
+  
+  kmclust = init_clust_data(kmclust, prof)
   
   for(i in 1:nclust){#sort within each cluster by rowSum
-    #size = kmclust$size
-    start = 1
-    if(i > 1){
-      start = sum(kmclust$size[1:(i-1)]) + 1
-    }
-    end = sum(kmclust$size[1:(i)])
-    #print(paste(start, end))
-    o = order(rowSums(prof[start:end,,drop = F]), decreasing = T)
-    prof[start:end,] = prof[start:end,,drop = F][o,, drop = F]
+    dat = fetch_clust(kmclust, i)
+    o = order(rowSums(dat), decreasing = T)
+    dat = dat[o,]
+    kmclust = replace_clust(kmclust, i, dat)
   }
   
   prof_ordered = matrix(0, ncol = ncol(prof), nrow = 0)#prof_ordered contains profiles rearranged at cluster level
@@ -160,20 +218,28 @@ heatmap.ngsplots = function(ngs_profiles,
   if(length(fg_toPlot) > 0){#correct for special selection color
     rColorChoices = c('white', rColorChoices[2:length(rColorChoices)-1])
   }
-  rColors = character()
-    
+  
+  
   for(i in 1:length(kmclust_order)){#sort k means clusters 
-    new_cluster = get_kmclust(kmclust_order[i])
-    prof_ordered = rbind(prof_ordered, new_cluster)
-    
-    cluster_color = rColorChoices[i]
-    rColors = c(rColors, rep(cluster_color, nrow(new_cluster)))
+    tomove = kmclust_order[i]
+    dest = i
+    kmclust = move_clust(kmclust, tomove, dest)
+    kmclust_order = ifelse(kmclust_order <= i, kmclust_order + 1, kmclust_order)#position of clusters less than i must be increased by 1
+    kmclust_order[1:i] = 1:i#up to i is sorted
+    #     
+    #     
+    #     new_cluster = get_kmclust(kmclust_order[i])
+    #     prof_ordered = rbind(prof_ordered, new_cluster)
+    #     
+    #     cluster_color = rColorChoices[i]
+    #     rColors = c(rColors, rep(cluster_color, nrow(new_cluster)))
   }
-  names(rColors) = rownames(prof_ordered)
+  rColors = rColorChoices[kmclust$cluster]
+  names(rColors) = rownames(kmclust$data)
   
   
   rseps = 1:(nclust-1)#cacluated row seperations
-  kmclust$size = kmclust$size[kmclust_order]
+  #kmclust$size = kmclust$size[kmclust_order]
   
   for(i in 1:nclust){
     size = kmclust$size
@@ -219,9 +285,9 @@ heatmap.ngsplots = function(ngs_profiles,
     extra_spacer = 2
   }
   args = list(
-    x = prof_ordered,key.lab = key.lab, key.cex = key.cex, 
+    x = kmclust$data,key.lab = key.lab, key.cex = key.cex, 
     RowSideLabels = RowSideLabels,
-    RowSideColors = rColors[rownames(prof_ordered)],
+    RowSideColors = rColors,
     labels.below = labels.below, cexRow = cex.row, cexCol = cex.col, col = colors, 
     rowsep.major = c(rep(rseps[1], extra_spacer), rseps), 
     colsep.minor = cseps, 
@@ -230,11 +296,12 @@ heatmap.ngsplots = function(ngs_profiles,
     sepwidth.major = .05, 
     labels.above = labels.above, 
     na.color = 'red', 
-    labels.rowsep = c(labels_right[1], rep('', extra_spacer), labels_right[2:length(labels_right)]), 
+    labels_rowsep = c(labels_right[1], rep('', extra_spacer), labels_right[2:length(labels_right)]), 
     main = main_title, cex.main = cex.main
-    )
+  )
   
   hidden = heatmap.2.2(args$x, key.lab = args$key.lab, args$key.cex, #key.par = list(mai = c(.5,0,0,0)),
+                       clust = kmclust,
                        RowSideLabels = args$RowSideLabels,
                        RowSideColors = args$RowSideColors,
                        labels.below = args$labels.below, cexRow = args$cexRow, cexCol = args$cexCol, col = args$col, 
@@ -245,9 +312,10 @@ heatmap.ngsplots = function(ngs_profiles,
                        sepwidth.major = args$sepwidth.major, 
                        labels.above = args$labels.above, 
                        na.color = args$na.colors, 
-                       labels.rowsep = args$labels.rowsep,
+                       labels_rowsep = args$labels_rowsep,
                        main = args$main,
-                       cex.main = args$cex.main)
+                       cex.main = args$cex.main,
+                       doSidePlot = T, extraData = extraData,lmat_custom = lmat_custom)
   cluster_members = list()
   for(i in 0:length(rseps)){
     start = 1
@@ -289,6 +357,7 @@ heatmap.replot_ngsplots = function(ngs_profiles, hmap_res, labels_above, labels_
   
   
   hidden = heatmap.2.2(x = prof, key.lab = args$key.lab, key.cex = args$key.cex, #key.par = list(mai = c(.5,0,0,0)),
+                       clust = kmclust,
                        RowSideLabels = args$RowSideLabels,
                        RowSideColors = args$RowSideColors,
                        labels.below = labels.below,
@@ -300,18 +369,20 @@ heatmap.replot_ngsplots = function(ngs_profiles, hmap_res, labels_above, labels_
                        colsep.minor = cseps, 
                        sepwidth.minor = args$sepwidth.minor, 
                        sepwidth.major = args$sepwidth.major, 
-                        
+                       
                        na.color = args$na.color, 
-                       labels.rowsep = args$labels.rowsep, 
+                       labels_rowsep = args$labels_rowsep, 
                        main = args$main,
-                       cex.main = args$cex.main)
+                       cex.main = args$cex.main,
+                       doSidePlot = T, extraData = extraData, lmat_custom = lmat_custom)
 }
 
 #dev.off()
 #dummy out tracing, dummy out clustering
 heatmap.2.2 = function (x,
+                        clust,
                         col, 
-                        
+                        lmat_custom = NULL,
                         #dividing up the plot
                         colsep.minor = -5, 
                         colsep.major = -1, 
@@ -334,7 +405,7 @@ heatmap.2.2 = function (x,
                         cexCol = 0.2 + 1/log10(nc),
                         labels.below = NULL, 
                         labels.above = NULL, 
-                        labels.rowsep = NULL,
+                        labels_rowsep = NULL,
                         
                         #left margin size
                         left_mai = .7,
@@ -345,7 +416,11 @@ heatmap.2.2 = function (x,
                         key.lab = 'Color Key', 
                         key.cex = 1,
                         key.xtickfun = NULL, 
-                        key.par = list()) 
+                        key.par = list(),
+                        
+                        #side plot of summary
+                        doSidePlot = T,
+                        extraData = NULL) 
 {
   x.original = x
   rowsep.minor = -1
@@ -353,7 +428,6 @@ heatmap.2.2 = function (x,
   rowsep.major.original = rowsep.major
   colsep.minor.original = colsep.minor
   colsep.major.original = colsep.major
-  #print(list(rowsep.minor.original, rowsep.major.original, colsep.minor.original, colsep.major.original))
   #sepwidth.minor = round(sepwidth.minor)
   #sepwidth.major = round(sepwidth.major)
   
@@ -366,68 +440,98 @@ heatmap.2.2 = function (x,
   
   dev.width = par('din')[1]
   dev.height = par('din')[2]
-  
-  lmat = 1
-  body.height = dev.height
-  body.width = dev.width
-  body.iy = 1
-  body.ix = 1
+  nclust = length(clust$size)
+  lmat = matrix(rep(1, nclust), ncol = 1)
+  body_height = dev.height
+  body_width = dev.width
+  body_iy = 1:nclust
+  body_ix = 1
   lwid = dev.width
   label.height = .5
   main.height = .8
-  lhei = body.height
-  
+  lhei = rep(body_height /nclust, nclust)
   if(!is.null(labels.above)){
     lmat = rbind(max(lmat) + 1, lmat)
-    lhei[body.iy] = lhei[body.iy] - label.height
+    lhei[body_iy] = lhei[body_iy] - label.height / nclust
     lhei = c(label.height, lhei)
-    body.iy = body.iy + 1
+    body_iy = body_iy + 1
   }
   if(!is.null(main)){
     lmat = rbind(max(lmat) + 1, lmat)
-    lhei[body.iy] = lhei[body.iy] - main.height
+    lhei[body_iy] = lhei[body_iy] - main.height / nclust
     lhei = c(main.height, lhei)
-    body.iy = body.iy + 1
+    body_iy = body_iy + 1
   }
   if(!is.null(labels.below)){
     lmat = rbind(lmat, max(lmat) + 1)
-    lhei[body.iy] = lhei[body.iy] - label.height
+    lhei[body_iy] = lhei[body_iy] - label.height / nclust
     lhei = c(lhei, label.height)
   }
   if(key){
     
     lmat = rbind(lmat, max(lmat) + 1)
-    lhei[body.iy] = lhei[body.iy] - key.height
+    lhei[body_iy] = lhei[body_iy] - key.height / nclust
     lhei = c(lhei, key.height)
   }
+  
   RowSideColors.size = 0
   if (!is.null(RowSideColors)) {
     if (!is.character(RowSideColors) || length(RowSideColors) != nrow(x)) 
       stop("'RowSideColors' must be a character vector of length nrow(x)")
-    RowSideColors.size = 1.5
-    lmat <- cbind(lmat, c(rep(0, body.iy-1), max(lmat)+1, rep(0, nrow(lmat)-body.iy)))
-    lwid[body.ix] = lwid[body.ix] - RowSideColors.size
+    RowSideColors.size = 1
+    lmat <- cbind(lmat, c(rep(0, min(body_iy)-1), rep(max(lmat)+1, nclust), rep(0, nrow(lmat)-max(body_iy))))
+    lwid[body_ix] = lwid[body_ix] - RowSideColors.size
     lwid <- c(lwid, RowSideColors.size)
   }
+  #  
+  sidePlotSize = 4
+  if(doSidePlot){
+    lmat <- lmat <- cbind(lmat, c(rep(0, min(body_iy)-1), rep(max(lmat)+1, nclust), rep(0, nrow(lmat)-max(body_iy))))
+    lmat <- lmat <- cbind(lmat, c(rep(0, min(body_iy)-1), (max(lmat)+1):(max(lmat) + nclust), rep(0, nrow(lmat)-max(body_iy))))
+    lwid[body_ix] = lwid[body_ix] - sidePlotSize
+    lwid <- c(lwid, .3*sidePlotSize, .7*sidePlotSize)
+  }
+  extraDataSize = 1
+  if(!is.null(extraData)){
+    lmat <- lmat <- cbind(lmat, c(rep(0, min(body_iy)-1), (max(lmat)+1):(max(lmat) + nclust), rep(0, nrow(lmat)-max(body_iy))))
+    lwid[body_ix] = lwid[body_ix] - extraDataSize
+    lwid <- c(lwid, extraDataSize)
+  }
   labRowSize = 0
-  if (!is.null(labels.rowsep)) {
+  if (!is.null(labels_rowsep)) {
     labRowSize = 1
-    lmat <- cbind(lmat, c(rep(0, body.iy-1), max(lmat)+1, rep(0, nrow(lmat)-body.iy)))
-    lwid[body.ix] = lwid[body.ix] - labRowSize
+    lmat <- cbind(lmat, c(rep(0, min(body_iy)-1), rep(max(lmat)+1, nclust), rep(0, nrow(lmat)-max(body_iy))))
+    lwid[body_ix] = lwid[body_ix] - labRowSize
     lwid <- c(lwid, labRowSize)
   }
   if(left_mai > 0){
     lmat <- cbind(rep(0, nrow(lmat)), lmat)
-    lwid[body.ix] = lwid[body.ix] - left_mai
+    lwid[body_ix] = lwid[body_ix] - left_mai
     lwid <- c(left_mai, lwid)
-    body.ix = body.ix + 1
+    body_ix = body_ix + 1
   }
   
-#   print(lmat)
-#   print(lhei)
-#   print(lwid)
   
-  layout(lmat, heights = lhei, widths = lwid)
+
+  if(!is.null(lmat_custom)){
+    if(class(lmat_custom) != 'matrix'){
+      stop('class of lmat_custom must be matrix')
+    }
+    if(dim(lmat_custom) != dim(lmat)){
+      stop(paste("lmat_custom does not match lmat. dim was", 
+                 paste(dim(lmat_custom), collapse = ', '), 
+                 "dim should be", 
+                 paste(dim(lmat), collapse = ', ')))
+    }
+    lmat_custom = ifelse(lmat_custom > 0, lmat_custom + max(lmat), 0)
+    lmat = lmat + lmat_custom
+  }
+    print(lmat)
+    print(lhei)
+    print(lwid)
+  nf = layout(lmat, heights = lhei, widths = lwid)
+  
+  #layout.show(nf)
   
   breaks <- length(col) + 1
   symbreaks = any(x < 0, na.rm = TRUE)
@@ -452,6 +556,7 @@ heatmap.2.2 = function (x,
   x[x > max.breaks] <- max.breaks
   
   x = x[nrow(x):1,]#reverse so heatmap top row is top row of input matrix
+  colorClasses = unique(RowSideColors)
   RowSideColors = rev(RowSideColors)
   nr <- nrow(x)
   nc <- ncol(x)
@@ -512,7 +617,7 @@ heatmap.2.2 = function (x,
   nr = nrow(x)
   
   #plots the body of the heatap
-  startRasterMode(width = lwid[body.ix], height = lhei[body.iy])
+  startRasterMode(width = lwid[body_ix], height = lhei[body_iy])
   image(0:nc, 0:nr, t(x), xlim = c(0, nc), ylim = c(0, nr), axes = FALSE, xlab = "", ylab = "", col = col, breaks = breaks)
   stopRasterMode(mai = rep(0,4))
   
@@ -573,7 +678,7 @@ heatmap.2.2 = function (x,
     }
     z <- seq(min.raw, max.raw, by = min(diff(breaks)/4))
     
-    startRasterMode(height = lhei[body.iy])
+    startRasterMode(height = lhei[body_iy])
     #draw the key color gradient
     image(z = matrix(z, ncol = 1), col = col, breaks = tmpbreaks, 
           xaxt = "n", yaxt = "n")
@@ -582,13 +687,11 @@ heatmap.2.2 = function (x,
       lv <- -100:100 * 2
       keep = lv > min.raw & lv < max.raw
       lv = lv[keep]
-#       print(lv)
       xmin = par('usr')[1]
       xmax = par('usr')[2]
       lvmin = min(lv)
       lvmax = max(lv)
       xv <- (lv - min.raw) / (max.raw - min.raw) * (xmax - xmin) + xmin
-#       print(xv)
       xargs <- list(at = xv, labels = lv)
     }
     else {
@@ -597,9 +700,9 @@ heatmap.2.2 = function (x,
     xargs$side <- 1
     par(xpd = NA)
     do.call(axis, xargs)
-#     MAX = max(abs(c(min(x), max(x))))
-#     par(usr = c(-MAX, MAX, 0, 1))
-#     axis(side = 1, )
+    #     MAX = max(abs(c(min(x), max(x))))
+    #     par(usr = c(-MAX, MAX, 0, 1))
+    #     axis(side = 1, )
     if (!is.na(key.lab)) {
       mtext(side = 3, key.lab, line = 2, padj = 1, 
             cex = key.cex)
@@ -620,8 +723,12 @@ heatmap.2.2 = function (x,
     names(cluster_ids) = 1:length(cluster_ids)
     cluster_ids = cluster_ids[!is.na(cluster_ids)]
     par(xpd = NA)
+    cluster_starts = 1:nclust
+    cluster_ends = 1:nclust
     for(i in 1:length(RowSideLabels)){
       keep = (cluster_ids == cluster_levels[i])
+      cluster_starts[i] = min(as.numeric(names(keep[keep])))
+      cluster_ends[i] = max(as.numeric(names(keep[keep])))
       center = mean(as.numeric(names(keep[keep])))
       rowLab = rev(RowSideLabels)[i]
       text(.5,center/nr, rowLab, adj = c(.5,.5), cex = cexRow)
@@ -630,50 +737,179 @@ heatmap.2.2 = function (x,
     #par(xpd = NA)
     
   }
-  if(!is.null(labels.rowsep)){
+  if(doSidePlot){
+    avgA = matrix(0,nclust, ncol(clust$centers))
+    for(i in 1:nrow(avgA)){
+      avgA[i,] = clust$centers[i,]
+    }
+    
+    #need to reverse order
+    #o=o[nclust:1,]
+    par(mai=rep(0,4))
+    plot0()
+    #     (x=c(0,1),frame.plot=FALSE, y=c(0,1), xaxt='n',yaxt='n', type="n", xlab="",
+    #          ylab="",xlim=c(0,1),ylim=c(0,1))
+    #no idea how these 'actual' margins are selected
+    min=0#-.04
+    max=1#1.04
+    rng=max-min
+    
+    ### draw the dotted lines connecting line plots to heatmap
+    #line at top and bottom
+    lines(c(0,1),c(0,0),lty=2)
+    lines(c(0,1),c(1,1),lty=2)
+    for(i in 1:(nclust-1)){
+      #calculate number of rows covered so far as fraction of total
+      hFrac_a = (cluster_ends[i]) / (max(cluster_ends))
+      hFrac_b = (cluster_starts[i+1]-1) / (max(cluster_ends))
+      hFrac_mean = mean(c(hFrac_a, hFrac_b))
+      lplotFrac = i/nclust
+      #x is always from min to max
+      #y goes from variable fraction on heatmap to constant fraction of plotting column
+      meet_in_middle = 0
+      if(meet_in_middle > 0){
+        mim = 1 - meet_in_middle
+        lines(c(min ,max - mim*rng),c(rng*hFrac_a,rng*hFrac_mean),lty=2)
+        lines(c(min,max - mim*rng),c(rng*hFrac_b,rng*hFrac_mean),lty=2)
+      }
+      
+      lines(c(min + meet_in_middle * rng, max), c(rng*hFrac_mean,rng*lplotFrac),lty=2)
+    }
+    
+    par(mar = c(0,0, 0,0.5))
+    
+    #draw line chart represented each class from clustering
+    nsplits = length(colsep.minor)+1
+    win = ncol(avgA) / nsplits
+    #     print(avgA)
+    colorClasses = RColorBrewer::brewer.pal(nsplits, 'Set1')
+    for (i in 1:nclust) { 
+      xrange <- as.numeric(range(1:(ncol(avgA)/nsplits)))
+      yrange <- range(avgA)
+      xspace = (xrange[2] - xrange[1]) * .15
+      yspace = (yrange[2] - yrange[1]) * .15
+      # set up the plot 
+      #op <- par(mar = rep(.01, 4))
+      plot(xrange, yrange, xaxt='n',yaxt='n', type="n", xlab="",
+           ylab="", ylim = c(min(yrange)-yspace, max(yrange)+yspace), xlim = c(min(xrange)-xspace, max(xrange)+xspace))  #c(minVal - .1*abs(minVal - maxVal),maxVal + .1*abs(minVal - maxVal))) 
+      colors <- colorClasses[i] 
+      linetype <- c(1:nclust) 
+      plotchar <- seq(18,18+nclust,1)
+      
+      #   axis(side=1,tick=TRUE,at=days)
+      vals <- avgA[i,]
+      for(s in 1:nsplits){
+        start = (s - 1) * win + 1
+        end = s * win
+        xs = 1:(ncol(avgA)/nsplits)#first half of profile
+        lines(xs, vals[start:end], type="l", lwd=2.5,
+              lty=1, col=colorClasses[s], pch=16) 
+      }
+      lines(rep(mean(xrange),2), yrange, lty = 3)
+    }
+  }
+  if(!is.null(extraData)){
+    par(mai = rep(0, 4), xpd = T)
+    for(i in 1:nclust){
+      #       plot0()
+      #       box()
+      subset = rownames(clust$data)[clust$cluster == i]
+      #print(subset)
+      dat = extraData[subset,]
+      colnames(dat) = NULL
+      M = colMeans(dat)
+      n = nrow(dat)
+      s = apply(dat, 2, sd)
+      SE = s / sqrt(n)
+      E = qt(.975, df=n - 1) * SE
+      low = M - E
+      mid = M
+      high = M + E
+      barplot2(mid, , ci.l = low, ci.u = high, col = colorClasses, plot.ci = T, log = 'y', ylim = c(50,2500), axes = F, space = 0, bty = 'o')
+      for(pos in c(150,300,600,1200)){
+        lines(c(0,nclust+1), c(pos,pos), lty = 2) 
+      }
+      
+      #axis(side = 2, at = c(250,500,1000,2000))
+      box()
+    }
+  }
+  par(xpd = NA)
+  if(!is.null(labels_rowsep)){
     par(mai = rep(0,4))
     plot0(height = nr)
-    for(i in 1:length(labels.rowsep)){
-      rsep_prev = 1
-      if(i > 1){
-        rsep_prev = rowsep.major[i - 1] + sepwidth.major
+    for(i in 1:length(labels_rowsep)){
+      if(!doSidePlot){
+        rsep_prev = 1
+        if(i > 1){
+          rsep_prev = rowsep.major[i - 1] + sepwidth.major
+        }
+        rsep_curr = rowsep.major.original[i]
+        if(i > 1){
+          rsep_curr = rsep_prev - 1 + rowsep.major.original[i] - rowsep.major.original[i - 1]
+        }
+        if(i > length(rowsep.major.original)){
+          rsep_curr = nrow(x)
+        }
+        rsep_mid = (mean(c(rsep_prev, rsep_curr)))
+        ypos = nr - rsep_mid + 1
+      }else{
+        ypos = nr - (i - .5) / nclust * nr
       }
-      rsep_curr = rowsep.major.original[i]
-      if(i > 1){
-        rsep_curr = rsep_prev - 1 + rowsep.major.original[i] - rowsep.major.original[i - 1]
-      }
-      if(i > length(rowsep.major.original)){
-        rsep_curr = nrow(x)
-      }
-      rsep_mid = (mean(c(rsep_prev, rsep_curr)))
-      ypos = nr - rsep_mid + 1
       
-      text(.5, ypos, labels.rowsep[i], adj = c(.5,.5), cex = cexRow )
+      text(.5, ypos, labels_rowsep[i], adj = c(.5,.5), cex = cexRow )
     }
   }
 }
 
 do_example = F
 if(do_example){
-  cl = 'MCF10A'
-  hm = c('H3K4AC', 'H3K4ME3')#c('H3K27AC','H3K27ME3','H3K4AC', 'H3K4ME3', 'H4K20ME3')
-  toPlot = paste(cl, hm, sep = '_')
-  ngs_profiles = list()
-  nr = 50
-  nc = 49
-  for(tp in toPlot){
-    dat = matrix(runif(nr * nc, -3, 7), nrow = nr, ncol = nc)
-    rownames(dat) = 1:nrow(dat)
-    reduce = runif(nr/2, 1, nr)
-    dat[reduce,] = dat[reduce,] - 4
-    dat = ifelse(dat < -3, -3, dat)
-    ngs_profiles[[tp]] = dat
+#   cl = 'MCF10A'
+#   hm = c('H3K4AC', 'H3K4ME3')#c('H3K27AC','H3K27ME3','H3K4AC', 'H3K4ME3', 'H4K20ME3')
+#   profiles_to_plot = paste(cl, hm, sep = '_')
+#   ngs_profiles = list()
+#   nr = 50
+#   nc = 49
+#   for(tp in profiles_to_plot){
+#     dat = matrix(runif(nr * nc, -3, 7), nrow = nr, ncol = nc)
+#     rownames(dat) = 1:nrow(dat)
+#     reduce = runif(nr/2, 1, nr)
+#     dat[reduce,] = dat[reduce,] - 4
+#     dat = ifelse(dat < -3, -3, dat)
+#     ngs_profiles[[tp]] = dat
+#   }
+  
+  
+  
+    load('norm_matched.save')
+    load('promoter_wide_matched_prof.save')
+  prof_normed = lapply(promoter_wide_matched_prof,  function(x){
+    MIN = quantile(x, .1)
+    MAX = quantile(x, .98)
+    x = ifelse(x < MIN, MIN, x)
+    x = ifelse(x > MAX, MAX, x)
+    u = mean(x)
+    sdev = sd(x)
+    x = (x - u) / sdev
+    return(x)
+  })
+  histone_mods = unique(sapply(strsplit(names(prof_normed), '_'), function(x)return(x[2])))
+  cell_lines = c('MCF10A', 'MCF7', 'MDA231')
+  pdf('compound_plots.pdf', width = 10, height = 8)
+  nr = 11
+  lmat_custom = matrix(0, ncol = 7, nrow = 11)
+  lmat_custom[nr-1,5] = 1
+  lmat_custom[nr-1,6] = 2
+  lmat_custom[nr,5:6] = 3
+  lmat_custom[1,7] = 4
+  for(i in 0:5){
+    main_title = paste(histone_mods[i+1], 'within 10kb of TSS')
+    res = heatmap.ngsplots(ngs_profiles = prof_normed[c(1,7,13)+i], label_clusters = T, extraData = rna_norm_matched, labels_below = cell_lines, labels_above = main_title,labels_right = '', sortClustersByTotal = T, labelWithCounts = T, cex.col = 1.4, nclust = 8, lmat_custom = lmat_custom)
+    plot0();text(.5,.5, 'average profile')
+    plot0();text(.5,.5, 'log gene expression')
+    plot0();legend('center', legend = c('MCF10A', 'MCF7', 'MDA231'), fill = RColorBrewer::brewer.pal(3, 'Set1'), horiz = T, bty = 'n')
+    plot0();text(.5,.5, 'cluster size')
+    
   }
-  
-  
-  
-  nclust = 4
-  res = heatmap.ngsplots(ngs_profiles = ngs_profiles,profiles_to_plot = toPlot, label_clusters = T, fg_label = 'selected', 
-                         main_title = 'title', nclust = nclust, labels_below = hm, labels_above = cl,
-                         fg_toPlot = 1:10, labels_right = 'genes', sortClustersByTotal = T, labelWithCounts = T)
+  dev.off()
 }

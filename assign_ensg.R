@@ -1,15 +1,18 @@
-assign_ensg = function(test_res, ref_dict) {
+assign_ensg = function(test_res, ref_dict, overlap = 0) {
+    if(overlap > 1 | overlap < 0){
+      stop('overlap must be between 0 and 1')
+    }
     all_chrms = union(unique(test_res[, 1]), unique(ref_dict$chrm))
     output = character()  #matrix(0, ncol = ncol(test_res), nrow = 0)
     for (chrm in all_chrms) {
         print(chrm)
-        output = c(output, assign_ensg_chrm(test_res, ref_dict, chrm))  #rbind(output, assign_ensg_chrm(test_res, ref_dict, chrm))
+        output = c(output, assign_ensg_chrm(test_res, ref_dict, chrm, overlap))  #rbind(output, assign_ensg_chrm(test_res, ref_dict, chrm))
         # break
     }
     return(output)
 }
 
-assign_ensg_chrm = function(test_res, ref_dict, chrm) {
+assign_ensg_chrm = function(test_res, ref_dict, chrm, overlap) {
     # columns must be chrm, start, end, ref_dict rownames are ids sort all by start then by chrm returns
     # test_res filtered by intersection with ref_dict, rownames assigned by ref_dict
     test_res = test_res[test_res[, 1] == chrm, ]
@@ -26,9 +29,6 @@ assign_ensg_chrm = function(test_res, ref_dict, chrm) {
     o = order(test_res[, 2])
     test_res = test_res[o, ]
     
-    keep_res = rep(F, nrow(test_res))
-    ensg_res = rep("", nrow(test_res))
-    
     all_ensg = character()
     # intersect ma_res with ensgs, assigning ensg or removing peaks
     for (i in 1:nrow(test_res)) {
@@ -43,13 +43,45 @@ assign_ensg_chrm = function(test_res, ref_dict, chrm) {
         ends_after_start = test_end >= ref_starts
         starts_before_end = test_start <= ref_ends
         
-        intersecting_ensg = ref_ensg[ends_after_start & starts_before_end]
-        all_ensg = c(all_ensg, intersecting_ensg)
+        is_overlap = ends_after_start & starts_before_end
+        intersecting_ensg = ref_ensg[is_overlap]
+        #need to test for overlap
+        if(F){#debug values for overlap
+          test_start = 0; test_end = 100
+          ref_starts = c(10, -50, 100, 70, -80, 110, -500); ref_ends = c(20, 10, 150, 120, -70, 120, 200)
+          answers = c(10, 10, 0, 30, 0, 0, 100)#n bp
+        }
+        if(overlap > 0 & length(intersecting_ensg) > 0){
+          max_starts = sapply(ref_starts[is_overlap], function(x){
+            max(x, test_start)
+          })
+          min_ends = sapply(ref_ends[is_overlap], function(x){
+            min(x, test_end)
+          })
+          bp_overlap = min_ends - max_starts
+          bp_overlap = min_in_place(bp_overlap, 0)
+          test_fraction = bp_overlap / (test_end - test_start)
+          ref_fraction = bp_overlap / (ref_ends[is_overlap] - ref_starts[is_overlap])
+          keep = (test_fraction >= overlap) | (ref_fraction >= overlap)
+          # print(sum(keep))
+          intersecting_ensg = intersecting_ensg[keep]
+        }
+        
+        
+        if(length(intersecting_ensg) == 0){
+          intersecting_ensg = paste0("no_match_", rownames(test_res)[i])
+        }
+        all_ensg = c(all_ensg, paste(intersecting_ensg, collapse = ';'))
     }
     return(all_ensg)
 } 
 
-resolve_overlaps = function(ref_dict){
+min_in_place <- function(x, a) {
+  x[x <= a] <- a
+  return(x)
+}
+
+resolve_overlaps_in_ref = function(ref_dict){
   overlap_perc = .8
   new_dict = ref_dict[integer(),]
   for(chrm in unique(ref_dict$chrm)){

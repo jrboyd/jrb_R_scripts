@@ -1,16 +1,21 @@
 
-countDir.read = function(countDir){
+countDir.read = function(countDir, pattern = NA){
   #given a directory containing counts files, return assembled matrix containing all data
   #count files must have same number of rows in the same order (no changing feature annotation)
   #count_unaligned : htseq-count outputs 5 rows of unaligned read types, should they be counted?
   #NOTE : keep as true for counts not from htseq-count
-  files = dir(countDir, full.names = T)
+  if(is.na(pattern)){
+    files = dir(countDir, full.names = T)
+  }else{
+    files = dir(countDir, full.names = T, pattern = pattern)
+  }
   
   dat = NULL
   rnames = NULL
-  cnames = dir(countDir)
-  
+  cnames = basename(files)
+  print('reading files')
   for(f in files){
+    print(f)
     tmp = read.table(f, row.names = 1)
     if(is.null(dat)){
       dat = matrix(0, nrow = nrow(tmp), ncol = 0)
@@ -18,6 +23,7 @@ countDir.read = function(countDir){
     }
     dat = cbind(dat, tmp)
   }
+  print('done!')
   
   colnames(dat) = cnames
   rownames(dat) = rnames

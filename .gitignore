@@ -8,4 +8,5 @@
 .Rproj.user/
 .Rproj.user
 jrb_R_scripts
-mycounts_annotation.gff
+*.gff
+*.pdf
