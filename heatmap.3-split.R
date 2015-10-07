@@ -121,6 +121,8 @@ heatmap.3 <- function (x,
   
   retval <- list()
   
+  
+  
   scale <- if(symm && missing(scale)) "none" else match.arg(scale)
   dendrogram <- match.arg(dendrogram)
   if(clusterSort) dendrogram = 'none'
@@ -231,14 +233,25 @@ heatmap.3 <- function (x,
   } else {
     rowInd <- nr:1
   }
+  require('RColorBrewer')
+  maxColors = 8
+  if(!is.na(override_o)){
+    classCount = nrow(override_o)
+  }
+  print(classCount)
+  colorClasses = brewer.pal(n = min(classCount,maxColors),name = "Dark2")
+  if(classCount > maxColors){
+    key = (0:(classCount-1)) %% maxColors + 1
+    print(key)
+    colorClasses = colorClasses[key]
+  }
   if(length(override_o) == 1 && is.na(override_o)){
     #jrb row side colors is default and get data classes
     dataClasses = cutree(tree=hcr, k=classCount)
     orderOfClasses = unique(dataClasses[rowInd])
     tmp = classCount:1
     tmp = tmp[order(orderOfClasses)]
-    require('RColorBrewer')
-    colorClasses = brewer.pal(n = classCount,name = "Dark2")
+    
     colorClasses = colorClasses[tmp]
     RowSideColors = colorClasses[dataClasses]
   }else{
@@ -249,7 +262,6 @@ heatmap.3 <- function (x,
     })
     
     classCount = nrow(override_o)
-    colorClasses = brewer.pal(n = classCount,name = "Dark2")
     RowSideColors = colorClasses[dataClasses]
   }
   ## if( dendrogram %in% c("both","column") )

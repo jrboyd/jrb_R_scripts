@@ -73,7 +73,7 @@ heatmap.3_kmeans_wrapper = function(dat, nclust = 4, hmap_colors = c("blue", 'wh
   
   
   override_o = cbind(1:nclust, clust_sizes)
-  heatmap.3(plot_dat, trace = 'n', Rowv = F, Colv = F, scale = 'n',  cexCol = 1.6, cexRow = .4, col = colors, density.info = 'n', key.xlab = "z-score of log gene norm-counts", key.title = "", labRow = "", override_o = override_o, nsplits = 1)
+  heatmap.3(plot_dat, trace = 'n', Rowv = F, Colv = F, scale = 'n',  cexCol = 1.6, cexRow = .4, col = colors, density.info = 'n', key.xlab = "z-score of log gene norm-counts", key.title = "", labRow = "", override_o = override_o, ...)
   
 #   library(xlsx)
 #   clust_memb_wb = createWorkbook()
@@ -90,4 +90,4 @@ heatmap.3_kmeans_wrapper = function(dat, nclust = 4, hmap_colors = c("blue", 'wh
 #   saveWorkbook(clust_memb_wb, "diff_mRNA_mMSCs_cluster_members.xlsx")
 }
 
-example_heatmap.3_kmeans_wrapper()
+if(F) example_heatmap.3_kmeans_wrapper()

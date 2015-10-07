@@ -12,7 +12,7 @@ library('gplots')
 
 plot0 = function(width = 1, height = 1){
   fudge = 0.037037037037
-  plot(c(0+fudge*width, width-fudge * width), c(0+fudge*height, height-fudge * height), type = 'n', xlab = '', ylab = '', axes = F, )
+  plot(c(0+fudge*width, width-fudge * width), c(0+fudge*height, height-fudge * height), type = 'n', xlab = '', ylab = '', axes = F)
 }
 
 startRasterMode = function(width = 1, height = 1){
@@ -34,6 +34,8 @@ heatmap.ngsplots = function(ngs_profiles,
                             main_title = NULL, 
                             lmat_custom = NULL,
                             profiles_to_plot = NA, 
+                            profile_colors = NA,
+                            side_plots = list(),#should be list of index array for side plots, if not list, will not be plotted.
                             nclust = 6, 
                             labels_below = NA, 
                             labels_above = NA, 
@@ -62,7 +64,13 @@ heatmap.ngsplots = function(ngs_profiles,
   if(length(profiles_to_plot) %% length(labels_above) != 0){
     stop('length of labels_above must divide profiles_to_plot evenly!')
   }
-  
+  doSidePlot = T
+  if(!class(side_plots) == 'list'){#sidePlots omitted if list not supplied
+    doSidePlot = F
+  }
+  if(length(side_plots) == 0){#if empty list (default), all profiles go in single side plot
+    side_plots = list(1:length(profiles_to_plot))
+  }
   
   prof = matrix(0, ncol = 0, nrow = nrow(ngs_profiles[[1]]))#assemble single matrix by joining selected profiles (matrices)
   hidden = lapply(profiles_to_plot, function(x){
@@ -86,6 +94,9 @@ heatmap.ngsplots = function(ngs_profiles,
     labels.above[labels_loc] = labels_above
   }
   
+  if(any(is.na(profile_colors))){
+    profile_colors = RColorBrewer::brewer.pal(length(profiles_to_plot), 'Set1')
+  }
   
   labels.below = rep('', ncol(prof))
   labels_loc = round((1:length(labels_below)-.499) * ncol(prof) / length(labels_below))
@@ -315,7 +326,11 @@ heatmap.ngsplots = function(ngs_profiles,
                        labels_rowsep = args$labels_rowsep,
                        main = args$main,
                        cex.main = args$cex.main,
-                       doSidePlot = T, extraData = extraData,lmat_custom = lmat_custom)
+                       doSidePlot = doSidePlot, 
+                       side_plots = side_plots, 
+                       side_plot_colors = profile_colors,
+                       extraData = extraData,
+                       lmat_custom = lmat_custom)
   cluster_members = list()
   for(i in 0:length(rseps)){
     start = 1
@@ -420,8 +435,11 @@ heatmap.2.2 = function (x,
                         
                         #side plot of summary
                         doSidePlot = T,
+                        side_plot_colors = NA,
+                        side_plots = list(),
                         extraData = NULL) 
 {
+  
   x.original = x
   rowsep.minor = -1
   rowsep.minor.original = rowsep.minor
@@ -484,12 +502,19 @@ heatmap.2.2 = function (x,
     lwid <- c(lwid, RowSideColors.size)
   }
   #  
-  sidePlotSize = 4
+  sidePlotSize_lines = .5
+  sidePlotSize_profs = 2
   if(doSidePlot){
     lmat <- lmat <- cbind(lmat, c(rep(0, min(body_iy)-1), rep(max(lmat)+1, nclust), rep(0, nrow(lmat)-max(body_iy))))
-    lmat <- lmat <- cbind(lmat, c(rep(0, min(body_iy)-1), (max(lmat)+1):(max(lmat) + nclust), rep(0, nrow(lmat)-max(body_iy))))
-    lwid[body_ix] = lwid[body_ix] - sidePlotSize
-    lwid <- c(lwid, .3*sidePlotSize, .7*sidePlotSize)
+    lwid[body_ix] = lwid[body_ix] - sidePlotSize_lines
+    lwid <- c(lwid, sidePlotSize_lines)
+    for(i in 1:length(side_plots)){
+      print(i)
+      
+      lmat <- lmat <- cbind(lmat, c(rep(0, min(body_iy)-1), (max(lmat)+1):(max(lmat) + nclust), rep(0, nrow(lmat)-max(body_iy))))
+      lwid[body_ix] = lwid[body_ix] - sidePlotSize_profs
+      lwid <- c(lwid, sidePlotSize_profs)
+    }
   }
   extraDataSize = 1
   if(!is.null(extraData)){
@@ -512,23 +537,25 @@ heatmap.2.2 = function (x,
   }
   
   
-
+  
   if(!is.null(lmat_custom)){
     if(class(lmat_custom) != 'matrix'){
       stop('class of lmat_custom must be matrix')
     }
-    if(dim(lmat_custom) != dim(lmat)){
+    if(any(dim(lmat_custom) != dim(lmat))){
       stop(paste("lmat_custom does not match lmat. dim was", 
                  paste(dim(lmat_custom), collapse = ', '), 
                  "dim should be", 
                  paste(dim(lmat), collapse = ', ')))
     }
+    print(dim(lmat_custom))
+    print(dim(lmat))
     lmat_custom = ifelse(lmat_custom > 0, lmat_custom + max(lmat), 0)
     lmat = lmat + lmat_custom
   }
-    print(lmat)
-    print(lhei)
-    print(lwid)
+  print(lmat)
+  print(lhei)
+  print(lwid)
   nf = layout(lmat, heights = lhei, widths = lwid)
   
   #layout.show(nf)
@@ -738,74 +765,83 @@ heatmap.2.2 = function (x,
     
   }
   if(doSidePlot){
-    avgA = matrix(0,nclust, ncol(clust$centers))
-    for(i in 1:nrow(avgA)){
-      avgA[i,] = clust$centers[i,]
-    }
-    
-    #need to reverse order
-    #o=o[nclust:1,]
-    par(mai=rep(0,4))
-    plot0()
-    #     (x=c(0,1),frame.plot=FALSE, y=c(0,1), xaxt='n',yaxt='n', type="n", xlab="",
-    #          ylab="",xlim=c(0,1),ylim=c(0,1))
-    #no idea how these 'actual' margins are selected
-    min=0#-.04
-    max=1#1.04
-    rng=max-min
-    
-    ### draw the dotted lines connecting line plots to heatmap
-    #line at top and bottom
-    lines(c(0,1),c(0,0),lty=2)
-    lines(c(0,1),c(1,1),lty=2)
-    for(i in 1:(nclust-1)){
-      #calculate number of rows covered so far as fraction of total
-      hFrac_a = (cluster_ends[i]) / (max(cluster_ends))
-      hFrac_b = (cluster_starts[i+1]-1) / (max(cluster_ends))
-      hFrac_mean = mean(c(hFrac_a, hFrac_b))
-      lplotFrac = i/nclust
-      #x is always from min to max
-      #y goes from variable fraction on heatmap to constant fraction of plotting column
-      meet_in_middle = 0
-      if(meet_in_middle > 0){
-        mim = 1 - meet_in_middle
-        lines(c(min ,max - mim*rng),c(rng*hFrac_a,rng*hFrac_mean),lty=2)
-        lines(c(min,max - mim*rng),c(rng*hFrac_b,rng*hFrac_mean),lty=2)
+    for(i_side in 1:length(side_plots)){
+      this_col = side_plots[[i_side]]
+      avgA = matrix(0,nclust, ncol(clust$centers))
+      for(i in 1:nrow(avgA)){
+        avgA[i,] = clust$centers[i,]
       }
       
-      lines(c(min + meet_in_middle * rng, max), c(rng*hFrac_mean,rng*lplotFrac),lty=2)
-    }
-    
-    par(mar = c(0,0, 0,0.5))
-    
-    #draw line chart represented each class from clustering
-    nsplits = length(colsep.minor)+1
-    win = ncol(avgA) / nsplits
-    #     print(avgA)
-    colorClasses = RColorBrewer::brewer.pal(nsplits, 'Set1')
-    for (i in 1:nclust) { 
-      xrange <- as.numeric(range(1:(ncol(avgA)/nsplits)))
-      yrange <- range(avgA)
-      xspace = (xrange[2] - xrange[1]) * .15
-      yspace = (yrange[2] - yrange[1]) * .15
-      # set up the plot 
-      #op <- par(mar = rep(.01, 4))
-      plot(xrange, yrange, xaxt='n',yaxt='n', type="n", xlab="",
-           ylab="", ylim = c(min(yrange)-yspace, max(yrange)+yspace), xlim = c(min(xrange)-xspace, max(xrange)+xspace))  #c(minVal - .1*abs(minVal - maxVal),maxVal + .1*abs(minVal - maxVal))) 
-      colors <- colorClasses[i] 
-      linetype <- c(1:nclust) 
-      plotchar <- seq(18,18+nclust,1)
-      
-      #   axis(side=1,tick=TRUE,at=days)
-      vals <- avgA[i,]
-      for(s in 1:nsplits){
-        start = (s - 1) * win + 1
-        end = s * win
-        xs = 1:(ncol(avgA)/nsplits)#first half of profile
-        lines(xs, vals[start:end], type="l", lwd=2.5,
-              lty=1, col=colorClasses[s], pch=16) 
+      #need to reverse order
+      #o=o[nclust:1,]
+      if(i_side == 1){
+        par(mai=rep(0,4))
+        plot0()
+        #     (x=c(0,1),frame.plot=FALSE, y=c(0,1), xaxt='n',yaxt='n', type="n", xlab="",
+        #          ylab="",xlim=c(0,1),ylim=c(0,1))
+        #no idea how these 'actual' margins are selected
+        min=0#-.04
+        max=1#1.04
+        rng=max-min
+        
+        ### draw the dotted lines connecting line plots to heatmap
+        #line at top and bottom
+        lines(c(0,1),c(0,0),lty=2)
+        lines(c(0,1),c(1,1),lty=2)
+        for(i in 1:(nclust-1)){
+          #calculate number of rows covered so far as fraction of total
+          hFrac_a = (cluster_ends[i]) / (max(cluster_ends))
+          hFrac_b = (cluster_starts[i+1]-1) / (max(cluster_ends))
+          hFrac_mean = mean(c(hFrac_a, hFrac_b))
+          lplotFrac = i/nclust
+          #x is always from min to max
+          #y goes from variable fraction on heatmap to constant fraction of plotting column
+          meet_in_middle = 0
+          if(meet_in_middle > 0){
+            mim = 1 - meet_in_middle
+            lines(c(min ,max - mim*rng),c(rng*hFrac_a,rng*hFrac_mean),lty=2)
+            lines(c(min,max - mim*rng),c(rng*hFrac_b,rng*hFrac_mean),lty=2)
+          }
+          
+          lines(c(min + meet_in_middle * rng, max), c(rng*hFrac_mean,rng*lplotFrac),lty=2)
+        }
       }
-      lines(rep(mean(xrange),2), yrange, lty = 3)
+      par(mar = c(0,0, 0,0))
+      
+      #draw line chart represented each class from clustering
+      nsplits = length(colsep.minor)+1
+      win = ncol(avgA) / nsplits
+      #     print(avgA)
+      prof_colors = side_plot_colors
+      if(any(is.na(side_plot_colors))){
+        side_plot_colors = RColorBrewer::brewer.pal(nsplits, 'Set1')
+      }
+      for (i in 1:nclust) { 
+        xrange <- as.numeric(range(1:(ncol(avgA)/nsplits)))
+        yrange <- range(avgA)
+        xspace = (xrange[2] - xrange[1]) * .15
+        yspace = (yrange[2] - yrange[1]) * .15
+        # set up the plot 
+        #op <- par(mar = rep(.01, 4))
+        plot(xrange, yrange, xaxt='n',yaxt='n', type="n", xlab="",
+             ylab="", ylim = c(min(yrange)-yspace, max(yrange)+yspace), xlim = c(min(xrange)-xspace, max(xrange)+xspace))  #c(minVal - .1*abs(minVal - maxVal),maxVal + .1*abs(minVal - maxVal))) 
+        colors <- prof_colors[i] 
+        linetype <- c(1:nclust) 
+        plotchar <- seq(18,18+nclust,1)
+        
+        #   axis(side=1,tick=TRUE,at=days)
+        vals <- avgA[i,]
+        for(s in 1:nsplits){
+          if(any(s == this_col)){
+            start = (s - 1) * win + 1
+            end = s * win
+            xs = 1:(ncol(avgA)/nsplits)#first half of profile
+            lines(xs, vals[start:end], type="l", lwd=2.5,
+                  lty=1, col=prof_colors[s], pch=16) 
+          }
+        }
+        lines(rep(mean(xrange),2), yrange, lty = 3)
+      }
     }
   }
   if(!is.null(extraData)){
@@ -825,7 +861,7 @@ heatmap.2.2 = function (x,
       low = M - E
       mid = M
       high = M + E
-      barplot2(mid, , ci.l = low, ci.u = high, col = colorClasses, plot.ci = T, log = 'y', ylim = c(50,2500), axes = F, space = 0, bty = 'o')
+      barplot2(mid, ci.l = low, ci.u = high, col = colorClasses, plot.ci = T, log = 'y', ylim = c(50,2500), axes = F, space = 0, bty = 'o')
       for(pos in c(150,300,600,1200)){
         lines(c(0,nclust+1), c(pos,pos), lty = 2) 
       }
@@ -862,54 +898,79 @@ heatmap.2.2 = function (x,
   }
 }
 
-do_example = F
+do_example = T
 if(do_example){
-#   cl = 'MCF10A'
-#   hm = c('H3K4AC', 'H3K4ME3')#c('H3K27AC','H3K27ME3','H3K4AC', 'H3K4ME3', 'H4K20ME3')
-#   profiles_to_plot = paste(cl, hm, sep = '_')
-#   ngs_profiles = list()
-#   nr = 50
-#   nc = 49
-#   for(tp in profiles_to_plot){
-#     dat = matrix(runif(nr * nc, -3, 7), nrow = nr, ncol = nc)
-#     rownames(dat) = 1:nrow(dat)
-#     reduce = runif(nr/2, 1, nr)
-#     dat[reduce,] = dat[reduce,] - 4
-#     dat = ifelse(dat < -3, -3, dat)
-#     ngs_profiles[[tp]] = dat
-#   }
+  #   cl = 'MCF10A'
+  #   hm = c('H3K4AC', 'H3K4ME3')#c('H3K27AC','H3K27ME3','H3K4AC', 'H3K4ME3', 'H4K20ME3')
+  #   profiles_to_plot = paste(cl, hm, sep = '_')
+  #   ngs_profiles = list()
+  #   nr = 50
+  #   nc = 49
+  #   for(tp in profiles_to_plot){
+  #     dat = matrix(runif(nr * nc, -3, 7), nrow = nr, ncol = nc)
+  #     rownames(dat) = 1:nrow(dat)
+  #     reduce = runif(nr/2, 1, nr)
+  #     dat[reduce,] = dat[reduce,] - 4
+  #     dat = ifelse(dat < -3, -3, dat)
+  #     ngs_profiles[[tp]] = dat
+  #   }
   
   
   
-    load('norm_matched.save')
-    load('promoter_wide_matched_prof.save')
-  prof_normed = lapply(promoter_wide_matched_prof,  function(x){
-    MIN = quantile(x, .1)
-    MAX = quantile(x, .98)
-    x = ifelse(x < MIN, MIN, x)
-    x = ifelse(x > MAX, MAX, x)
-    u = mean(x)
-    sdev = sd(x)
-    x = (x - u) / sdev
-    return(x)
+  #   load('norm_matched.save')
+  #   load('promoter_wide_matched_prof.save')
+  nr = 200
+  nc = 100
+  nmods = 2
+  nlines = 3
+  
+  prof_normed = lapply(1:(nmods * nlines),function(x){
+    set.seed(x)
+    out = matrix(runif(nr*nc)/10, nrow = nr, ncol = nc)
+    affected = runif(nr) > runif(1)
+    out[affected,] = out[affected,] * 10
+    out = out * 100
+    rownames(out) = paste('gene', 1:nr)
+    return(out)
   })
-  histone_mods = unique(sapply(strsplit(names(prof_normed), '_'), function(x)return(x[2])))
-  cell_lines = c('MCF10A', 'MCF7', 'MDA231')
-  pdf('compound_plots.pdf', width = 10, height = 8)
-  nr = 11
-  lmat_custom = matrix(0, ncol = 7, nrow = 11)
-  lmat_custom[nr-1,5] = 1
-  lmat_custom[nr-1,6] = 2
-  lmat_custom[nr,5:6] = 3
-  lmat_custom[1,7] = 4
-  for(i in 0:5){
-    main_title = paste(histone_mods[i+1], 'within 10kb of TSS')
-    res = heatmap.ngsplots(ngs_profiles = prof_normed[c(1,7,13)+i], label_clusters = T, extraData = rna_norm_matched, labels_below = cell_lines, labels_above = main_title,labels_right = '', sortClustersByTotal = T, labelWithCounts = T, cex.col = 1.4, nclust = 8, lmat_custom = lmat_custom)
-    plot0();text(.5,.5, 'average profile')
-    plot0();text(.5,.5, 'log gene expression')
-    plot0();legend('center', legend = c('MCF10A', 'MCF7', 'MDA231'), fill = RColorBrewer::brewer.pal(3, 'Set1'), horiz = T, bty = 'n')
-    plot0();text(.5,.5, 'cluster size')
-    
+  #   prof_normed = lapply(promoter_wide_matched_prof,  function(x){
+  #     MIN = quantile(x, .1)
+  #     MAX = quantile(x, .98)
+  #     x = ifelse(x < MIN, MIN, x)
+  #     x = ifelse(x > MAX, MAX, x)
+  #     u = mean(x)
+  #     sdev = sd(x)
+  #     x = (x - u) / sdev
+  #     return(x)
+  #   })
+  histone_mods = paste('mod', 1:nmods)
+  cell_lines = paste('line', 1:nlines)
+  prof_names = 1:(nmods*nlines)
+  i = 1
+  for(hm in histone_mods){
+    for(cl in cell_lines){
+      prof_names[i] = paste(cl, hm)
+      i = i + 1
+    }
   }
-  dev.off()
+  names(prof_normed) = prof_names
+  # pdf('compound_plots.pdf', width = 10, height = 8)
+  nr = 9
+  nc = 8
+  lmat_custom = matrix(0, ncol = nc, nrow = nr)
+  lmat_custom[nr-1,nc-2] = 1
+  lmat_custom[nr-1,nc-1] = 2
+  lmat_custom[nr,-2:-1 + nc] = 3
+  lmat_custom[1,nc] = 4
+  # for(i in 0:5){
+  main_title = 'simulated data'
+  profile_colors = rep(RColorBrewer::brewer.pal(2, 'Set1')[1:2],3)
+  profile_colors[6] = 'yellow'
+  res = heatmap.ngsplots(ngs_profiles = prof_normed, profile_colors = profile_colors,side_plots = list(1:2,3:4, 5:6), labels_below = rep(cell_lines,2), labels_above = histone_mods, lmat_custom = lmat_custom, labelWithCounts = T, labels_right = 'g')
+  plot0();text(.5,.5, 'average profile')
+  plot0();text(.5,.5, 'log gene expression')
+  plot0();legend('center', legend = cell_lines, fill = RColorBrewer::brewer.pal(3, 'Set1'), horiz = T, bty = 'n')
+  plot0();text(.5,.5, 'cluster size')
+  
 }
+# dev.off()

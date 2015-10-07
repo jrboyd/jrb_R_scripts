@@ -10,3 +10,7 @@
 jrb_R_scripts
 *.gff
 *.pdf
+jrb_heatmaps.Rcheck
+jrbScripts
+jrb_heatmaps
+tmp.png
